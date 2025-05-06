@@ -3,29 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador de Circuitos Eléctricos</title>
+    <title>Simulador de Circuitos Eléctricos (Transitorio Básico)</title>
     <script src="https://unpkg.com/react@17/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+
     <style>
-        /* --- ESTILOS CSS (Ligeros ajustes para el botón movido) --- */
-        :root {
-            --primary-color: #3498db;
-            --secondary-color: #2ecc71;
-            --danger-color: #e74c3c;
-            --dark-color: #2c3e50;
-            --light-color: #ecf0f1;
-            --component-color: #7f8c8d;
-            --current-color: #f39c12;
-            --wire-color: #34495e;
-            --terminal-color: #95a5a6;
-            --terminal-hover-color: var(--primary-color);
-            --terminal-connected-color: var(--secondary-color);
-        }
-        /* ... (Resto de estilos casi idénticos a la versión anterior) ... */
+        /* --- ESTILOS CSS (Ajustes menores para animación y errores) --- */
+        :root { /* ... Colores igual que antes ... */ --primary-color: #3498db; --secondary-color: #2ecc71; --danger-color: #e74c3c; --dark-color: #2c3e50; --light-color: #ecf0f1; --component-color: #7f8c8d; --current-color: #f39c12; --wire-color: #34495e; --terminal-color: #95a5a6; --terminal-hover-color: var(--primary-color); --terminal-connected-color: var(--secondary-color); }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background-color: #f5f7fa; }
-        .navbar { background-color: var(--dark-color); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); z-index: 10; }
+        .navbar { background-color: var(--dark-color); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 10; }
         .navbar h1 { font-size: 1.5rem; margin: 0; }
         .navbar-buttons { display: flex; gap: 0.5rem; }
         .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; transition: all 0.2s; }
@@ -37,7 +26,7 @@
         .btn-danger { background-color: var(--danger-color); color: white; border: 1px solid var(--danger-color); }
         .btn-danger:not(:disabled):hover { background-color: #c0392b; border-color: #c0392b;}
         .btn-sm { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
-        .btn-full-width { display: block; width: 100%; margin-top: 1rem; } /* Estilo para botón al 100% */
+        .btn-full-width { display: block; width: 100%; margin-top: 1rem; }
 
         .main-container { display: flex; flex: 1; overflow: hidden; }
         .sidebar { width: 250px; background-color: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; overflow: hidden; }
@@ -53,22 +42,27 @@
         .workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
         .components-toolbar { padding: 0.5rem; background-color: white; border-bottom: 1px solid #ddd; display: flex; gap: 0.5rem; overflow-x: auto; }
         .component-btn { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 60px; transition: all 0.2s; }
-        .component-btn:hover { background-color: #f5f7fa; border-color: #ccc; }
+        .component-btn:hover:not(:disabled) { background-color: #f5f7fa; border-color: #ccc; } /* :not(:disabled) añadido */
         .component-btn:disabled { background-color: #eee; cursor: not-allowed; opacity: 0.6; }
         .component-icon { width: 24px; height: 24px; stroke: var(--component-color); stroke-width: 1.5; fill: none; }
         .component-label { font-size: 0.7rem; text-align: center; }
 
-        .circuit-canvas { flex: 1; background-color: #ffffff; background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px); background-size: 20px 20px; overflow: auto; position: relative; } /* Cambiado a overflow: auto */
-        .circuit-stage { width: 200%; height: 200%; /* Tamaño más grande para scroll */ position: relative; /* Cambiado a relative */ top: 0; left: 0; overflow: visible; z-index: 1; }
-        #connections-svg { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; overflow: visible; /* Asegurar que se vean líneas fuera del viewport inicial */ }
-        #connections-svg .connection-wire { stroke: var(--wire-color); stroke-width: 2.5px; stroke-linecap: round; transition: stroke 0.2s ease-in-out; pointer-events: stroke; cursor: pointer; }
+        .circuit-canvas { flex: 1; background-color: #ffffff; background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px); background-size: 20px 20px; overflow: auto; position: relative; }
+        .circuit-stage { width: 200%; height: 200%; position: relative; top: 0; left: 0; overflow: visible; z-index: 1; }
+        #connections-svg { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; overflow: visible; }
+        #connections-svg .connection-wire { stroke: var(--wire-color); stroke-width: 2.5px; stroke-linecap: round; transition: stroke 0.1s ease-in-out, stroke-dasharray 0.1s linear; pointer-events: stroke; cursor: pointer; }
         #connections-svg .connection-wire:hover { stroke: var(--primary-color); }
-        #connections-svg .connection-wire.active { stroke: var(--current-color); }
+        #connections-svg .connection-wire.active { stroke: var(--current-color); animation: currentFlow 1.5s infinite linear; } /* Reactivada animación */
+        #connections-svg .connection-wire.error { stroke: var(--danger-color); stroke-dasharray: 5, 5; }
         #connections-svg .temp-wire { stroke: var(--primary-color); stroke-width: 2px; stroke-dasharray: 5, 5; }
+        /* Animación de corriente */
+         @keyframes currentFlow { 0% { stroke-dashoffset: 20; } 100% { stroke-dashoffset: 0; } }
+         #connections-svg .connection-wire.active { stroke-dasharray: 10, 10; }
 
 
-        .component { position: absolute; background-color: white; border: 1px solid #aaa; border-radius: 4px; padding: 5px; min-width: 60px; display: flex; flex-direction: column; align-items: center; cursor: move; user-select: none; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); z-index: 1; transition: box-shadow 0.2s, border-color 0.2s; }
+        .component { position: absolute; background-color: white; border: 1px solid #aaa; border-radius: 4px; padding: 5px; min-width: 60px; display: flex; flex-direction: column; align-items: center; cursor: move; user-select: none; box-shadow: 0 1px 2px rgba(0,0,0,0.1); z-index: 1; transition: box-shadow 0.2s, border-color 0.2s, background-color 0.2s; }
         .component.selected { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.4); }
+        .component.error { border: 2px solid var(--danger-color); background-color: #fdd; }
         .component.connecting { cursor: crosshair; }
         .component-header { display: flex; justify-content: space-between; width: 100%; margin-bottom: 4px; font-size: 0.7rem; color: #555; }
         .component-name { font-weight: 500; }
@@ -76,6 +70,8 @@
         .component-visual { width: 100%; height: 30px; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
         .component-visual svg { width: 32px; height: 32px; stroke: var(--dark-color); stroke-width: 1.5; fill: none; }
         .component[data-type="switch"] .component-visual { cursor: pointer; }
+        .component-sim-value { font-size: 0.7em; color: var(--primary-color); margin-top: 2px; text-align: center; width: 100%;}
+
 
         .component-terminal { position: absolute; width: 12px; height: 12px; background-color: var(--terminal-color); border-radius: 50%; border: 2px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.2); z-index: 2; cursor: crosshair; transition: background-color 0.2s; }
         .component-terminal:hover, .component-terminal.highlight { background-color: var(--terminal-hover-color); }
@@ -84,19 +80,17 @@
         .terminal-top { top: -7px; left: 50%; transform: translateX(-50%); }
         .terminal-bottom { bottom: -7px; left: 50%; transform: translateX(-50%); }
 
-        .control-panel { width: 300px; background-color: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; overflow: hidden; /* Evita que el botón se salga */ }
-        .panel-section { padding: 1rem; border-bottom: 1px solid #ddd; /* Se mantiene en los dos primeros */ }
-        .panel-section:last-of-type { border-bottom: none; flex-grow: 1; overflow-y: auto; /* Scroll solo en propiedades */ }
-        .panel-section-fixed { /* Nueva clase para sección simulación y botón gráfica */ padding: 1rem; border-bottom: 1px solid #ddd; flex-shrink: 0; }
-
+        .control-panel { width: 300px; background-color: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; overflow: hidden; }
+        .panel-section { padding: 1rem; border-bottom: 1px solid #ddd; }
+        .panel-section:last-of-type { border-bottom: none; flex-grow: 1; overflow-y: auto; }
+        .panel-section-fixed { padding: 1rem; border-bottom: 1px solid #ddd; flex-shrink: 0; }
         .panel-title { font-weight: 600; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
         .panel-title button { padding: 2px 6px; font-size: 0.8rem; }
         .simulation-controls { display: flex; flex-direction: column; gap: 0.75rem; }
         #simulationTime { font-weight: bold; }
         .control-group { display: flex; flex-direction: column; gap: 0.25rem; }
         .control-label { font-size: 0.85rem; color: #666; }
-        .component-properties { /* Ya no necesita flex:1 ni overflow */ }
-        .no-component-selected { color: #666; font-style: italic; font-size: 0.9rem; padding-top: 1rem; /* Añadir padding si es necesario */ }
+        .no-component-selected { color: #666; font-style: italic; font-size: 0.9rem; padding-top: 1rem; }
         .property-group { margin-bottom: 0.75rem; }
         .property-item { display: flex; align-items: center; margin-bottom: 0.5rem; gap: 0.5rem; }
         .property-label { width: 80px; font-size: 0.85rem; color: #555; text-align: right; flex-shrink: 0; }
@@ -104,7 +98,6 @@
         .property-input:disabled { background-color: #f8f9fa; cursor: not-allowed; }
         .property-unit { font-size: 0.85rem; color: #777; }
 
-        /* ... Estilos Modal, Tooltip, Notification, Spinner, Component Specifics sin cambios ... */
         .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: none; justify-content: center; align-items: center; z-index: 999; }
         .modal.active { display: flex; }
         .modal-content { background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
@@ -139,7 +132,7 @@
         .notification-message { font-size: 0.9rem; color: #555; }
         .loading-spinner { border: 4px solid rgba(0, 0, 0, 0.1); border-radius: 50%; border-top: 4px solid var(--primary-color); width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .led-visual { width: 20px; height: 20px; border-radius: 50%; background-color: #777; border: 2px solid #555; transition: all 0.3s; box-shadow: inset 0 0 5px rgba(0,0,0,0.2); }
+        .led-visual { width: 20px; height: 20px; border-radius: 50%; background-color: #777; border: 2px solid #555; transition: all 0.1s; /* Transición más rápida */ box-shadow: inset 0 0 5px rgba(0,0,0,0.2); }
         .led-visual.on { background-color: #f1c40f; border-color: #f39c12; box-shadow: 0 0 12px rgba(241, 196, 15, 0.9), inset 0 0 5px rgba(255,255,255,0.3); }
         .switch-visual { width: 30px; height: 10px; background-color: #ccc; border: 1px solid #999; position: relative; border-radius: 2px; cursor: pointer; }
         .switch-visual::before { content: ''; position: absolute; width: 4px; height: 14px; background-color: #666; top: -3px; left: 4px; transform-origin: bottom center; transform: rotate(-45deg); transition: transform 0.2s ease-in-out, left 0.2s ease-in-out; border-radius: 1px; }
@@ -149,212 +142,743 @@
 </head>
 <body>
     <div class="navbar">
-        <h1>Simulador de Circuitos Eléctricos</h1>
+        <h1>Simulador de Circuitos Eléctricos (Transitorio Básico)</h1>
         <div class="navbar-buttons">
             <button id="newCircuitBtn" class="btn btn-primary">Nuevo Circuito</button>
-            <button id="simulateBtn" class="btn btn-success">Iniciar Simulación</button>
-            </div>
+            <button id="simulateBtn" class="btn btn-success">Iniciar Simulación</button> <button id="stopSimBtn" class="btn btn-danger" style="display: none;">Detener Simulación</button> </div>
     </div>
 
     <div class="main-container">
         <div class="sidebar">
-            <div class="sidebar-title">Mis Circuitos</div>
-            <div id="circuitsList" class="circuits-list"></div>
-        </div>
+             <div class="sidebar-title">Mis Circuitos</div>
+             <div id="circuitsList" class="circuits-list"></div>
+         </div>
 
         <div class="workspace">
             <div class="components-toolbar" id="componentsToolbar">
-                <button class="component-btn" data-component="resistor" title="Resistencia"><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 6 L 7 9 L 9 15 L 11 9 L 13 15 L 15 9 L 17 15 L 18 12 H 20"/></svg><span class="component-label">Resistor</span></button>
+                 <button class="component-btn" data-component="resistor" title="Resistencia"><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 6 L 7 9 L 9 15 L 11 9 L 13 15 L 15 9 L 17 15 L 18 12 H 20"/></svg><span class="component-label">Resistor</span></button>
                  <button class="component-btn" data-component="capacitor" title="Capacitor"><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 10 M 14 12 H 20 M 10 6 V 18 M 14 6 V 18"/></svg><span class="component-label">Capacitor</span></button>
                  <button class="component-btn" data-component="inductor" title="Inductor"><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 7 C 7 9 9 9 9 12 C 9 15 11 15 11 12 C 11 9 13 9 13 12 C 13 15 15 15 15 12 H 20"/></svg><span class="component-label">Inductor</span></button>
                  <button class="component-btn" data-component="led" title="LED"><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 8 L 12 7 L 16 12 H 20 M 12 7 V 17 M 9 17 H 15"/><line x1="17" y1="6" x2="19" y2="4" stroke-width="1.5"/><line x1="18" y1="8" x2="20" y2="6" stroke-width="1.5"/></svg><span class="component-label">LED</span></button>
-                 <button class="component-btn" data-component="switch" title="Interruptor"><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 8 M 16 12 H 20 M 8 12 L 16 8"/><circle cx="8" cy="12" r="2.5" fill="white"/><circle cx="16" cy="12" r="2.5" fill="white"/></svg><span class="component-label">Switch</span></button>
-                 <button class="component-btn" data-component="battery" title="Batería (Fuente de Voltaje DC)"><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 8 M 16 12 H 20 M 8 8 V 16 M 12 10 V 14 M 16 8 V 16"/><text x="17" y="9" font-size="5" fill="currentColor">+</text><text x="17" y="17" font-size="5" fill="currentColor">-</text></svg><span class="component-label">Batería</span></button>
+                 <button class="component-btn" data-component="switch" title="Interruptor" ><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 8 M 16 12 H 20 M 8 12 L 16 8"/><circle cx="8" cy="12" r="2.5" fill="white"/><circle cx="16" cy="12" r="2.5" fill="white"/></svg><span class="component-label">Switch</span></button>
+                 <button class="component-btn" data-component="battery" title="Batería (Fuente DC)"><svg class="component-icon" viewBox="0 0 24 24"><path d="M4 12 H 8 M 16 12 H 20 M 8 8 V 16 M 12 10 V 14 M 16 8 V 16"/><text x="17" y="9" font-size="5" fill="currentColor">+</text><text x="17" y="17" font-size="5" fill="currentColor">-</text></svg><span class="component-label">Batería</span></button>
                  <button class="component-btn" data-component="ground" title="Tierra"><svg class="component-icon" viewBox="0 0 24 24"><path d="M12 4 V 12 M 8 12 H 16 M 9 15 H 15 M 10.5 18 H 13.5"/></svg><span class="component-label">Tierra</span></button>
             </div>
             <div class="circuit-canvas" id="circuitCanvas">
-                 <svg id="connections-svg" width="200%" height="200%"></svg> <div id="circuitStage" class="circuit-stage"></div>
+                 <svg id="connections-svg" width="200%" height="200%"></svg>
+                <div id="circuitStage" class="circuit-stage"></div>
                  <div id="tooltip" class="tooltip"></div>
             </div>
         </div>
 
         <div class="control-panel">
-            <div class="panel-section-fixed">
-                <div class="panel-title">Control de Simulación</div>
+             <div class="panel-section-fixed">
+                <div class="panel-title">Control Simulación</div>
                 <div class="simulation-controls">
-                    <button id="resetSimulationBtn" class="btn btn-danger">Detener Simulación</button>
-                    <div class="control-group">
-                        <div class="control-label">Tiempo de simulación: <span id="simulationTime">0.00s</span></div>
+                     <div class="control-group">
+                        <div class="control-label">Tiempo Simulación: <span id="simulationTime">0.00s</span></div>
                     </div>
-                    <div id="simulationStatus" style="font-size: 0.9rem; margin-top: 5px;">Estado: Detenido</div>
+                     <div class="control-group">
+                          <label class="control-label" for="simDurationInput">Duración (s):</label>
+                          <input type="number" id="simDurationInput" value="5" min="0.1" step="0.1" class="property-input" style="max-width: 100px;">
+                     </div>
+                      <div class="control-group">
+                          <label class="control-label" for="timeStepInput">Paso Tiempo (ms):</label>
+                          <input type="number" id="timeStepInput" value="10" min="0.1" step="0.1" class="property-input" style="max-width: 100px;">
+                     </div>
+                    <div id="simulationStatus" style="font-size: 0.9rem; margin-top: 5px;">Estado: No simulado</div>
                 </div>
             </div>
             <div class="panel-section" id="componentPropertiesSection">
-                 <div class="panel-title" id="componentPropertiesTitle">
-                      <span>Propiedades</span>
-                      <button id="deleteComponentBtn" class="btn btn-danger btn-sm" style="display: none;">Eliminar</button>
-                  </div>
-                 <div id="componentPropertiesContent">
-                     <div class="no-component-selected">Selecciona un componente para ver/editar sus propiedades</div>
-                 </div>
+                 <div class="panel-title" id="componentPropertiesTitle"><span>Propiedades</span><button id="deleteComponentBtn" class="btn btn-danger btn-sm" style="display: none;">Eliminar</button></div>
+                 <div id="componentPropertiesContent"><div class="no-component-selected">Selecciona un componente...</div></div>
             </div>
-             <div class="panel-section-fixed">
+            <div class="panel-section-fixed">
                  <button id="generateGraphBtn" class="btn btn-primary btn-full-width">Generar Gráfica</button>
              </div>
         </div>
     </div>
 
-    <div id="newCircuitModal" class="modal"> <div class="modal-content" style="max-width: 500px;">
-              <div class="modal-header"><div class="modal-title">Nuevo Circuito</div><button class="modal-close" data-close-modal="newCircuitModal">&times;</button></div>
-              <div class="modal-body" style="padding: 1.5rem;"><form id="newCircuitForm" class="new-circuit-form"><div class="form-group"><label class="form-label" for="circuitNameInput">Nombre</label><input type="text" id="circuitNameInput" class="form-input" placeholder="Ej: Circuito RC Básico" required></div><div class="form-group"><label class="form-label" for="circuitDescriptionInput">Descripción</label><textarea id="circuitDescriptionInput" class="form-input" rows="3" placeholder="Breve descripción..."></textarea></div><div class="form-buttons"><button type="button" class="btn btn-danger" data-close-modal="newCircuitModal">Cancelar</button><button type="submit" class="btn btn-primary">Crear</button></div></form></div>
-          </div>
-      </div>
-     <div id="graphModal" class="modal"> <div class="modal-content">
-              <div class="modal-header"><div class="modal-title">Análisis del Circuito</div><button class="modal-close" data-close-modal="graphModal">&times;</button></div>
-              <div class="modal-body">
+    <div id="newCircuitModal" class="modal"> <div class="modal-content" style="max-width: 500px;"><div class="modal-header"><div class="modal-title">Nuevo Circuito</div><button class="modal-close" data-close-modal="newCircuitModal">&times;</button></div><div class="modal-body" style="padding: 1.5rem;"><form id="newCircuitForm" class="new-circuit-form"><div class="form-group"><label class="form-label" for="circuitNameInput">Nombre</label><input type="text" id="circuitNameInput" class="form-input" placeholder="Ej: Circuito RLC" required></div><div class="form-group"><label class="form-label" for="circuitDescriptionInput">Descripción</label><textarea id="circuitDescriptionInput" class="form-input" rows="3" placeholder="Breve descripción..."></textarea></div><div class="form-buttons"><button type="button" class="btn btn-danger" data-close-modal="newCircuitModal">Cancelar</button><button type="submit" class="btn btn-primary">Crear</button></div></form></div></div></div>
+     <div id="graphModal" class="modal">
+          <div class="modal-content">
+              <div class="modal-header"><div class="modal-title">Gráficas de Simulación (Aprox.)</div><button class="modal-close" data-close-modal="graphModal">&times;</button></div>
+              <div class="modal-body" id="graphResultsBody">
                   <div class="tabs">
-                      <div class="tab active" data-tab="voltage">Voltaje (Ejemplo)</div><div class="tab" data-tab="current">Corriente (Ejemplo)</div><div class="tab" data-tab="power">Potencia (Ejemplo)</div>
+                      <div class="tab active" data-tab="voltage">Voltaje</div>
+                      <div class="tab" data-tab="current">Corriente</div>
+                      <div class="tab" data-tab="power">Potencia</div>
                   </div>
-                  <div id="voltageTab" class="tab-content active"><div class="graph-container" id="voltageGraph">Cargando...</div><p style="font-size: 0.8em; text-align: center; color: #888;">Nota: Datos de ejemplo.</p></div>
-                  <div id="currentTab" class="tab-content"><div class="graph-container" id="currentGraph">Cargando...</div><p style="font-size: 0.8em; text-align: center; color: #888;">Nota: Datos de ejemplo.</p></div>
-                  <div id="powerTab" class="tab-content"><div class="graph-container" id="powerGraph">Cargando...</div><p style="font-size: 0.8em; text-align: center; color: #888;">Nota: Datos de ejemplo.</p></div>
+                  <div id="voltageTab" class="tab-content active"><div class="graph-container" id="voltageGraph">Cargando...</div></div>
+                  <div id="currentTab" class="tab-content"><div class="graph-container" id="currentGraph">Cargando...</div></div>
+                  <div id="powerTab" class="tab-content"><div class="graph-container" id="powerGraph">Cargando...</div></div>
+                   <p style="font-size: 0.8em; text-align: center; color: #888; padding: 0 1.5rem 1rem 1.5rem;">Nota: Simulación aproximada (Backward Euler, LED simplificado). Puede ser inexacta o inestable.</p>
               </div>
           </div>
       </div>
 
-     <div class="notification" id="notification">
-        <div class="notification-title" id="notificationTitle">Título</div>
-        <div class="notification-message" id="notificationMessage">Mensaje</div>
-    </div>
+     <div class="notification" id="notification"><div class="notification-title" id="notificationTitle"></div><div class="notification-message" id="notificationMessage"></div></div>
 
     <script>
+        if (typeof math === 'undefined') alert("Error Crítico: Math.js no cargado.");
+        if (typeof Recharts === 'undefined') alert("Error Crítico: Recharts no cargado.");
+        if (typeof React === 'undefined') alert("Error Crítico: React no cargado.");
+        if (typeof ReactDOM === 'undefined') alert("Error Crítico: ReactDOM no cargado.");
+
         const CircuitSimulator = {
-            // --- STATE (igual) ---
+            // --- STATE ---
             circuits: [], currentCircuitId: null, components: [], connections: [], selectedComponentId: null, selectedConnectionId: null,
             isDragging: false, draggedComponentId: null, dragOffset: { x: 0, y: 0 }, isConnecting: false, connectionStart: null, tempWire: null,
-            isSimulating: false, simulationTime: 0, simulationInterval: null, simulationSpeed: 1, simulationData: [],
+            isSimulating: false, // Estado de simulación en curso
+            simulationTime: 0, simulationInterval: null, // Intervalo para UI
+            simulationData: [], // [{time, nodeVoltages: Map<nodeId, v>, componentValues: Map<compId, {v,i,p,state?}>}, ...]
+            simSettings: { duration: 5, timeStep: 0.01 }, // s, s (dt) - dt en segundos ahora
+            simError: null, // Guarda el último error de simulación
 
-            // --- DOM Elements (igual) ---
-            circuitStage: document.getElementById('circuitStage'), connectionsSvg: document.getElementById('connections-svg'), circuitsListEl: document.getElementById('circuitsList'),
-            componentPropertiesContentEl: document.getElementById('componentPropertiesContent'), componentPropertiesTitleEl: document.getElementById('componentPropertiesTitle'),
-            deleteComponentBtn: document.getElementById('deleteComponentBtn'), tooltipEl: document.getElementById('tooltip'), simulationTimeEl: document.getElementById('simulationTime'),
-            simulationStatusEl: document.getElementById('simulationStatus'), simulateBtn: document.getElementById('simulateBtn'), generateGraphBtn: document.getElementById('generateGraphBtn'),
-            newCircuitModal: document.getElementById('newCircuitModal'), graphModal: document.getElementById('graphModal'), notificationEl: document.getElementById('notification'),
-            notificationTitleEl: document.getElementById('notificationTitle'), notificationMessageEl: document.getElementById('notificationMessage'),
+            // --- DOM Elements ---
+             circuitStage: document.getElementById('circuitStage'), connectionsSvg: document.getElementById('connections-svg'), circuitsListEl: document.getElementById('circuitsList'),
+             componentPropertiesContentEl: document.getElementById('componentPropertiesContent'), componentPropertiesTitleEl: document.getElementById('componentPropertiesTitle'),
+             deleteComponentBtn: document.getElementById('deleteComponentBtn'), tooltipEl: document.getElementById('tooltip'), simulationTimeEl: document.getElementById('simulationTime'),
+             simulationStatusEl: document.getElementById('simulationStatus'), simulateBtn: document.getElementById('simulateBtn'), stopSimBtn: document.getElementById('stopSimBtn'),
+             generateGraphBtn: document.getElementById('generateGraphBtn'), simDurationInput: document.getElementById('simDurationInput'), timeStepInput: document.getElementById('timeStepInput'),
+             newCircuitModal: document.getElementById('newCircuitModal'), graphModal: document.getElementById('graphModal'), graphResultsBody: document.getElementById('graphResultsBody'),
+             notificationEl: document.getElementById('notification'), notificationTitleEl: document.getElementById('notificationTitle'), notificationMessageEl: document.getElementById('notificationMessage'),
 
-            // --- CONSTANTS (igual) ---
-             COMPONENT_DEFAULTS: { resistor: { value: 1000, unit: 'Ω' }, capacitor: { value: 1e-6, unit: 'F' }, inductor: { value: 1e-3, unit: 'H' }, led: { forwardVoltage: 2.0, unit: 'V', state: 'off' }, switch: { state: 'open' }, battery: { value: 9, unit: 'V' }, ground: {}, },
-             TERMINAL_POSITIONS: { resistor: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], capacitor: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], inductor: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], led: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], switch: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], battery: [{ id: 0, side: 'top' }, { id: 1, side: 'bottom' }], ground: [{ id: 0, side: 'top' }], },
-             COMPONENT_SVG_ICONS: { resistor: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 5 L 7 5 L 11 15 L 15 5 L 19 15 L 23 5 L 27 15 L 29 10 H 38" stroke="black" stroke-width="1.5" fill="none"/></svg>`, capacitor: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 15 M 25 10 H 38 M 15 4 V 16 M 25 4 V 16" stroke="black" stroke-width="1.5" fill="none"/></svg>`, inductor: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 8 C 8 5 12 5 12 10 C 12 15 16 15 16 10 C 16 5 20 5 20 10 C 20 15 24 15 24 10 C 24 5 28 5 28 10 H 38" stroke="black" stroke-width="1.5" fill="none"/></svg>`, led: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 10 L 20 5 L 30 10 H 38 M 20 5 V 15 M 15 15 H 25" stroke="black" stroke-width="1.5" fill="none"/><circle cx="20" cy="10" r="12" stroke="black" stroke-width="1" fill="none" stroke-dasharray="2 2"/></svg>`, switch: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 10 M 30 10 H 38 M 10 10 L 30 5" stroke="black" stroke-width="1.5" fill="none"/><circle cx="10" cy="10" r="3" fill="white" stroke="black" stroke-width="1.5"/><circle cx="30" cy="10" r="3" fill="white" stroke="black" stroke-width="1.5"/></svg>`, battery: `<svg viewBox="0 0 20 30"><path d="M 2 15 H 18 M 5 10 V 20 M 15 5 V 25" stroke="black" stroke-width="1.5" fill="none"/><text x="1" y="7" font-size="6">+</text><text x="1" y="27" font-size="6">-</text></svg>`, ground: `<svg viewBox="0 0 20 30"><path d="M 10 2 V 15 M 4 15 H 16 M 6 19 H 14 M 8 23 H 12" stroke="black" stroke-width="1.5" fill="none"/></svg>`, },
+            // --- CONSTANTS ---
+             COMPONENT_DEFAULTS: {
+                 resistor: { value: 1000, unit: 'Ω', maxPower: 0.25 },
+                 capacitor: { value: 1e-6, unit: 'F', icVoltage: 0 }, // Condición inicial Voltaje
+                 inductor: { value: 1e-3, unit: 'H', icCurrent: 0 }, // Condición inicial Corriente
+                 led: { forwardVoltage: 2.0, unit: 'V', r_on: 5, state: 'off' }, // Añadida R_on baja
+                 switch: { state: 'open', r_on: 0.01, r_off: 1e9 },
+                 battery: { value: 9, unit: 'V' }, ground: {},
+             },
+             TERMINAL_POSITIONS: { /* igual */ resistor: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], capacitor: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], inductor: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], led: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], switch: [{ id: 0, side: 'left' }, { id: 1, side: 'right' }], battery: [{ id: 0, side: 'top' }, { id: 1, side: 'bottom' }], ground: [{ id: 0, side: 'top' }], },
+             COMPONENT_SVG_ICONS: { /* igual */ resistor: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 5 L 7 5 L 11 15 L 15 5 L 19 15 L 23 5 L 27 15 L 29 10 H 38" stroke="black" stroke-width="1.5" fill="none"/></svg>`, capacitor: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 15 M 25 10 H 38 M 15 4 V 16 M 25 4 V 16" stroke="black" stroke-width="1.5" fill="none"/></svg>`, inductor: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 8 C 8 5 12 5 12 10 C 12 15 16 15 16 10 C 16 5 20 5 20 10 C 20 15 24 15 24 10 C 24 5 28 5 28 10 H 38" stroke="black" stroke-width="1.5" fill="none"/></svg>`, led: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 10 L 20 5 L 30 10 H 38 M 20 5 V 15 M 15 15 H 25" stroke="black" stroke-width="1.5" fill="none"/><circle cx="20" cy="10" r="12" stroke="black" stroke-width="1" fill="none" stroke-dasharray="2 2"/></svg>`, switch: `<svg viewBox="0 0 40 20"><path d="M 2 10 H 10 M 30 10 H 38 M 10 10 L 30 5" stroke="black" stroke-width="1.5" fill="none"/><circle cx="10" cy="10" r="3" fill="white" stroke="black" stroke-width="1.5"/><circle cx="30" cy="10" r="3" fill="white" stroke="black" stroke-width="1.5"/></svg>`, battery: `<svg viewBox="0 0 20 30"><path d="M 2 15 H 18 M 5 10 V 20 M 15 5 V 25" stroke="black" stroke-width="1.5" fill="none"/><text x="1" y="7" font-size="6">+</text><text x="1" y="27" font-size="6">-</text></svg>`, ground: `<svg viewBox="0 0 20 30"><path d="M 10 2 V 15 M 4 15 H 16 M 6 19 H 14 M 8 23 H 12" stroke="black" stroke-width="1.5" fill="none"/></svg>`, },
+             GROUND_NODE_ID: 'node_0',
+             // SUPPORTED_COMPONENTS: ['resistor', 'battery', 'ground', 'switch', 'capacitor', 'inductor', 'led'], // Todos ahora (con limitaciones)
 
-            // --- INITIALIZATION (igual) ---
-            init() { this.loadCircuitsFromStorage(); this.setupEventListeners(); this.renderCircuitsList(); if (this.circuits.length > 0) { const lastId = localStorage.getItem('lastCircuitId'); const circuitToLoad = this.circuits.find(c => c.id === lastId) || this.circuits[0]; this.loadCircuit(circuitToLoad.id); } else { this.createNewCircuit("Circuito Inicial", "Circuito de demostración"); } this.showNotification("Simulador iniciado", "Listo para diseñar.", "success"); this.checkRecharts(); },
-            checkRecharts() { if (typeof Recharts === 'undefined') { console.error("Recharts no está cargado."); this.showNotification("Error Librería", "Recharts no se cargó.", "error", 5000); this.generateGraphBtn.disabled = true; } else { console.log("Recharts cargado."); } },
+            // --- INITIALIZATION ---
+             init() { this.loadCircuitsFromStorage(); this.setupEventListeners(); this.renderCircuitsList(); if (this.circuits.length > 0) { const lastId = localStorage.getItem('lastCircuitId'); const cLoad = this.circuits.find(c => c.id === lastId) || this.circuits[0]; this.loadCircuit(cLoad.id); } else { this.createNewCircuit("Circuito Transitorio", ""); } this.showNotification("Simulador iniciado", "Listo (Transitorio Aprox.).", "success"); this.checkLibs(); },
+             checkLibs() { let ok = true; if (typeof math === 'undefined') { console.error("Math.js NO cargado."); ok = false; } if (typeof Recharts === 'undefined') { console.error("Recharts NO cargado."); ok = false; } if (typeof React === 'undefined') { console.error("React NO cargado."); ok = false; } if (typeof ReactDOM === 'undefined') { console.error("ReactDOM NO cargado."); ok = false; } if (!ok) { this.showNotification("Error Crítico", "Faltan librerías JS.", "error", 10000); this.simulateBtn.disabled = true; this.generateGraphBtn.disabled = true; } else { console.log("Librerías OK."); } },
 
-            // --- EVENT LISTENERS (igual) ---
-             setupEventListeners() { document.getElementById('newCircuitBtn').addEventListener('click', () => this.showModal('newCircuitModal')); this.simulateBtn.addEventListener('click', () => this.toggleSimulation()); document.getElementById('resetSimulationBtn').addEventListener('click', () => this.stopSimulation()); this.generateGraphBtn.addEventListener('click', () => this.showGraphModal()); document.querySelectorAll('.component-btn').forEach(button => { button.addEventListener('click', (e) => { const type = button.dataset.component; const rect = this.circuitStage.getBoundingClientRect(); const x = this.circuitStage.parentElement.scrollLeft + rect.width / 2 - 50; const y = this.circuitStage.parentElement.scrollTop + rect.height / 2 - 25; this.addComponent(type, x, y); }); button.addEventListener('mouseenter', (e) => this.showTooltip(e.currentTarget.title, e)); button.addEventListener('mouseleave', () => this.hideTooltip()); }); this.circuitStage.addEventListener('mousedown', this.handleStageMouseDown.bind(this)); document.addEventListener('mousemove', this.handleDocumentMouseMove.bind(this)); document.addEventListener('mouseup', this.handleDocumentMouseUp.bind(this)); this.circuitStage.addEventListener('dblclick', this.handleStageDoubleClick.bind(this)); this.circuitStage.addEventListener('mouseover', this.handleStageMouseOver.bind(this)); this.circuitStage.addEventListener('mouseout', this.handleStageMouseOut.bind(this)); this.connectionsSvg.addEventListener('contextmenu', (e) => { if (e.target.classList.contains('connection-wire')) { e.preventDefault(); const connId = e.target.dataset.connectionId; if (connId && confirm(`¿Eliminar conexión ${connId.slice(0,6)}...?`)) { this.deleteConnection(connId); } } }); this.deleteComponentBtn.addEventListener('click', () => this.deleteSelectedComponent()); this.circuitsListEl.addEventListener('click', (e) => { const item = e.target.closest('.circuit-item'); const delBtn = e.target.closest('.delete-circuit-btn'); if (delBtn && item) { e.stopPropagation(); const id = item.dataset.circuitId; if (confirm(`¿Eliminar circuito "${this.circuits.find(c=>c.id===id)?.name}"?`)) { this.deleteCircuit(id); } } else if (item) { this.loadCircuit(item.dataset.circuitId); } }); document.querySelectorAll('[data-close-modal]').forEach(btn => btn.addEventListener('click', () => this.hideModal(btn.dataset.closeModal))); document.getElementById('newCircuitForm').addEventListener('submit', (e) => { e.preventDefault(); const name = document.getElementById('circuitNameInput').value.trim(); const desc = document.getElementById('circuitDescriptionInput').value.trim(); if (name) { this.createNewCircuit(name, desc); this.hideModal('newCircuitModal'); e.target.reset(); } }); this.graphModal.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', (e) => this.switchGraphTab(e.target))); document.addEventListener('keydown', this.handleKeyDown.bind(this)); },
+            // --- EVENT LISTENERS ---
+             setupEventListeners() { document.getElementById('newCircuitBtn').addEventListener('click', () => this.showModal('newCircuitModal')); this.simulateBtn.addEventListener('click', () => this.startSimulation()); /* Iniciar */ this.stopSimBtn.addEventListener('click', () => this.stopSimulation()); /* Detener */ this.generateGraphBtn.addEventListener('click', () => this.showGraphModal()); /* Mostrar gráficas */ this.simDurationInput.addEventListener('change', (e) => this.updateSimSetting('duration', parseFloat(e.target.value))); this.timeStepInput.addEventListener('change', (e) => this.updateSimSetting('timeStep', parseFloat(e.target.value) / 1000.0)); /* Convertir ms a s */ document.querySelectorAll('.component-btn').forEach(b => { b.addEventListener('click', (e) => { const t = b.dataset.component; const r = this.circuitStage.parentElement.getBoundingClientRect(); const x = this.circuitStage.parentElement.scrollLeft+r.width/2-50; const y = this.circuitStage.parentElement.scrollTop+r.height/2-25; this.addComponent(t, x, y); }); b.addEventListener('mouseenter', (e) => this.showTooltip(e.currentTarget.title, e)); b.addEventListener('mouseleave', () => this.hideTooltip()); }); this.circuitStage.addEventListener('mousedown', this.handleStageMouseDown.bind(this)); document.addEventListener('mousemove', this.handleDocumentMouseMove.bind(this)); document.addEventListener('mouseup', this.handleDocumentMouseUp.bind(this)); this.circuitStage.addEventListener('dblclick', this.handleStageDoubleClick.bind(this)); this.circuitStage.addEventListener('mouseover', this.handleStageMouseOver.bind(this)); this.circuitStage.addEventListener('mouseout', this.handleStageMouseOut.bind(this)); this.connectionsSvg.addEventListener('contextmenu', (e) => { if (e.target.classList.contains('connection-wire')) { e.preventDefault(); const id = e.target.dataset.connectionId; if (id && confirm(`¿Eliminar conexión ${id.slice(0,6)}...?`)) this.deleteConnection(id); } }); this.deleteComponentBtn.addEventListener('click', () => this.deleteSelectedComponent()); this.circuitsListEl.addEventListener('click', (e) => { const i = e.target.closest('.circuit-item'); const dB = e.target.closest('.delete-circuit-btn'); if (dB && i) { e.stopPropagation(); const id = i.dataset.circuitId; if (confirm(`¿Eliminar circuito "${this.circuits.find(c=>c.id===id)?.name}"?`)) this.deleteCircuit(id); } else if (i) this.loadCircuit(i.dataset.circuitId); }); document.querySelectorAll('[data-close-modal]').forEach(b => b.addEventListener('click', () => this.hideModal(b.dataset.closeModal))); document.getElementById('newCircuitForm').addEventListener('submit', (e) => { e.preventDefault(); const n = document.getElementById('circuitNameInput').value.trim(); const d = document.getElementById('circuitDescriptionInput').value.trim(); if (n) { this.createNewCircuit(n, d); this.hideModal('newCircuitModal'); e.target.reset(); } }); this.graphModal.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', (e) => this.switchGraphTab(e.target))); document.addEventListener('keydown', this.handleKeyDown.bind(this)); },
+            updateSimSetting(key, value) { if (!isNaN(value) && value > 0) { if (key === 'timeStep' && value < 0.0001) { // Limitar dt mínimo (ej. 0.1ms) this.showNotification("Advertencia", "Paso de tiempo muy pequeño.", "warning"); value = 0.0001; this.timeStepInput.value = value * 1000; } this.simSettings[key] = value; console.log(`Sim setting ${key} updated to ${value}`); } else { this.showNotification("Error", `Valor inválido para ${key}.`, "error"); // Restaurar valor visual if(key === 'duration') this.simDurationInput.value = this.simSettings.duration; if(key === 'timeStep') this.timeStepInput.value = this.simSettings.timeStep * 1000; } },
 
-            // --- CORE LOGIC: Components (igual) ---
-             addComponent(type, x, y) { if (!this.currentCircuitId) { this.showNotification("Error", "No hay circuito activo.", "error"); return; } const id = `comp_${Date.now()}_${Math.random().toString(16).slice(2)}`; const props = JSON.parse(JSON.stringify(this.COMPONENT_DEFAULTS[type] || {})); const terms = this.TERMINAL_POSITIONS[type] || []; const comp = { id, type, x: Math.max(0, x), y: Math.max(0, y), properties: props, terminals: terms.map(t => ({ id: `${id}_term_${t.id}`, parentId: id, side: t.side, connectedTo: null })) }; this.components.push(comp); this.renderComponent(comp); this.selectComponent(id); this.saveCurrentCircuit(); this.showNotification("Componente añadido", `${type}`, "success", 1500); },
-             renderComponent(component) { let el = document.getElementById(component.id); if (!el) { el = document.createElement('div'); el.id = component.id; el.className = 'component'; el.dataset.componentId = component.id; el.dataset.type = component.type; this.circuitStage.appendChild(el); el.addEventListener('mousedown', (e) => { if (!e.target.classList.contains('component-terminal')) this.handleComponentMouseDown(e, component.id); }); if (component.type === 'switch') el.addEventListener('click', (e) => { if (!this.isDragging && !this.isConnecting) this.toggleSwitch(component.id); }); } el.style.left = `${component.x}px`; el.style.top = `${component.y}px`; const valStr = component.properties.value !== undefined ? `${component.properties.value}${component.properties.unit || ''}` : (component.type === 'ground' ? 'GND' : ''); const visHTML = this.getComponentVisualHTML(component); el.innerHTML = `<div class="component-header"><span class="component-name">${component.type}</span><span class="component-value">${valStr}</span></div><div class="component-visual">${visHTML}</div>${component.terminals.map(t => `<div class="component-terminal ${this.getTerminalPositionClass(t.side)}" data-terminal-id="${t.id}" data-parent-id="${component.id}" title="Terminal ${t.id.slice(-1)}"></div>`).join('')}`; el.querySelectorAll('.component-terminal').forEach(tEl => tEl.addEventListener('mousedown', (e) => { e.stopPropagation(); this.handleTerminalMouseDown(e, tEl.dataset.parentId, tEl.dataset.terminalId); })); el.classList.toggle('selected', component.id === this.selectedComponentId); this.updateComponentVisualState(component); },
-             getComponentVisualHTML(component) { switch (component.type) { case 'led': return `<div class="led-visual ${component.properties.state === 'on' ? 'on' : ''}"></div>`; case 'switch': return `<div class="switch-visual ${component.properties.state === 'closed' ? 'on' : ''}"></div>`; default: return this.COMPONENT_SVG_ICONS[component.type] || `<span style="font-size:0.8em;">${component.type}</span>`; } },
-             updateComponentVisualState(component) { const el = document.getElementById(component.id); if (!el) return; if (component.type === 'led') { const led = el.querySelector('.led-visual'); if(led) led.classList.toggle('on', component.properties.state === 'on'); } else if (component.type === 'switch') { const sw = el.querySelector('.switch-visual'); if(sw) sw.classList.toggle('on', component.properties.state === 'closed'); } },
-             toggleSwitch(componentId) { const comp = this.getComponentById(componentId); if (!comp || comp.type !== 'switch') return; comp.properties.state = (comp.properties.state === 'open') ? 'closed' : 'open'; this.updateComponentVisualState(comp); this.renderComponentProperties(comp); this.saveCurrentCircuit(); if (this.isSimulating) this.runSimulationStep(); this.showNotification("Switch", `Estado: ${comp.properties.state}`, "info", 1000); },
-             getTerminalPositionClass(side) { switch (side) { case 'left': return 'terminal-left'; case 'right': return 'terminal-right'; case 'top': return 'terminal-top'; case 'bottom': return 'terminal-bottom'; default: return 'terminal-right'; } },
-             getTerminalAbsolutePosition(componentId, terminalId) { const comp = this.getComponentById(componentId); const term = comp?.terminals.find(t => t.id === terminalId); const compEl = document.getElementById(componentId); const termEl = compEl?.querySelector(`[data-terminal-id="${terminalId}"]`); if (!comp || !term || !compEl || !termEl) { console.error("GetPos: Comp/Term no encontrado:", componentId, terminalId); return null; } const termRect = termEl.getBoundingClientRect(); const stageRect = this.circuitStage.parentElement.getBoundingClientRect(); /* Usar el canvas con scroll */ const x = termRect.left + termRect.width / 2 - stageRect.left + this.circuitStage.parentElement.scrollLeft; const y = termRect.top + termRect.height / 2 - stageRect.top + this.circuitStage.parentElement.scrollTop; return { x, y }; },
-             deleteComponent(componentId) { const conns = this.connections.filter(c => c.startCompId === componentId || c.endCompId === componentId); conns.forEach(c => this.deleteConnection(c.id, false)); this.components = this.components.filter(c => c.id !== componentId); const el = document.getElementById(componentId); if (el) el.remove(); if (this.selectedComponentId === componentId) this.selectComponent(null); this.renderAllConnections(); this.saveCurrentCircuit(); this.showNotification("Componente eliminado", "", "info", 1500); },
-             deleteSelectedComponent() { if (this.selectedComponentId) this.deleteComponent(this.selectedComponentId); },
-             selectComponent(componentId) { if (this.selectedComponentId === componentId && componentId !== null) return; /* Evitar re-render si ya está seleccionado */ if (this.selectedComponentId) { const oldEl = document.getElementById(this.selectedComponentId); if (oldEl) oldEl.classList.remove('selected'); } this.selectedComponentId = componentId; this.selectedConnectionId = null; if (this.selectedComponentId) { const newEl = document.getElementById(this.selectedComponentId); if (newEl) newEl.classList.add('selected'); const comp = this.getComponentById(componentId); this.renderComponentProperties(comp); this.deleteComponentBtn.style.display = 'inline-block'; this.deleteComponentBtn.disabled = this.isSimulating; /* Deshabilitar si simula */ } else { this.renderComponentProperties(null); this.deleteComponentBtn.style.display = 'none'; } },
-             renderComponentProperties(component) { if (!component) { this.componentPropertiesContentEl.innerHTML = `<div class="no-component-selected">Selecciona un componente...</div>`; this.componentPropertiesTitleEl.querySelector('span').textContent = 'Propiedades'; return; } this.componentPropertiesTitleEl.querySelector('span').textContent = `Propiedades (${component.type} - ${component.id.slice(0,8)})`; let html = '<div class="property-group">'; const dis = this.isSimulating ? 'disabled' : ''; if (component.properties.value !== undefined) { html += `<div class="property-item"><label class="property-label" for="prop_${component.id}_value">Valor:</label><input class="property-input" type="number" step="any" id="prop_${component.id}_value" data-property="value" value="${component.properties.value}" ${dis}>${component.properties.unit ? `<span class="property-unit">${component.properties.unit}</span>` : ''}</div>`; } if (component.type === 'led' && component.properties.forwardVoltage !== undefined) { html += `<div class="property-item"><label class="property-label" for="prop_${component.id}_fv">Voltaje (Fwd):</label><input class="property-input" type="number" step="0.1" id="prop_${component.id}_fv" data-property="forwardVoltage" value="${component.properties.forwardVoltage}" ${dis}><span class="property-unit">V</span></div>`; } if (component.properties.state !== undefined) { html += `<div class="property-item"><label class="property-label">Estado:</label><span style="font-weight:500;">${component.properties.state}</span>${component.type === 'switch' ? '<span style="font-size:0.8em; color:#888;"> (Clic para cambiar)</span>' : ''}</div>`; } html += '</div>'; this.componentPropertiesContentEl.innerHTML = html; this.componentPropertiesContentEl.querySelectorAll('.property-input').forEach(input => { input.addEventListener('change', (e) => { const prop = e.target.dataset.property; let val = e.target.value; if (e.target.type === 'number' || !isNaN(parseFloat(val))) { val = parseFloat(val); if (isNaN(val)) { this.showNotification("Error", "Valor inválido.", "error"); e.target.value = component.properties[prop]; return; } } this.updateComponentProperty(component.id, prop, val); }); }); },
-            /* updateComponentProperty: Actualiza el modelo y LUEGO llama a renderComponentProperties para refrescar la UI.
-               Esto asegura que la UI siempre refleje el estado real del modelo. No crea 'otra casilla'. */
-             updateComponentProperty(componentId, propertyName, newValue) { const comp = this.getComponentById(componentId); if (!comp || !comp.properties.hasOwnProperty(propertyName)) return; comp.properties[propertyName] = newValue; this.renderComponent(comp); this.renderComponentProperties(comp); this.saveCurrentCircuit(); if (this.isSimulating) this.runSimulationStep(); },
+            // --- CORE LOGIC: Components ---
+             addComponent(type, x, y) { if (!this.currentCircuitId) { this.showNotification("Error", "No hay circuito activo.", "error"); return; } const id = `comp_${Date.now()}_${Math.random().toString(16).slice(2)}`; const props = JSON.parse(JSON.stringify(this.COMPONENT_DEFAULTS[type] || {})); const terms = this.TERMINAL_POSITIONS[type] || []; const comp = { id, type, x: Math.max(0, x), y: Math.max(0, y), properties: props, terminals: terms.map(t => ({ id: `${id}_term_${t.id}`, parentId: id, side: t.side, connectedTo: null })), simulation: {} }; this.components.push(comp); this.renderComponent(comp); this.selectComponent(id); this.clearSimulationResults(); this.saveCurrentCircuit(); this.showNotification("Componente añadido", `${type}`, "success", 1500); },
+             renderComponent(component) { let el = document.getElementById(component.id); if (!el) { el = document.createElement('div'); el.id = component.id; el.className = 'component'; el.dataset.componentId = component.id; el.dataset.type = component.type; this.circuitStage.appendChild(el); el.addEventListener('mousedown', (e) => { if (!e.target.classList.contains('component-terminal') && !this.isSimulating) this.handleComponentMouseDown(e, component.id); }); if (component.type === 'switch') el.addEventListener('click', (e) => { if (!this.isDragging && !this.isConnecting && !this.isSimulating) this.toggleSwitch(component.id); }); } el.style.left = `${component.x}px`; el.style.top = `${component.y}px`; const valStr = component.properties.value !== undefined ? `${component.properties.value}${component.properties.unit || ''}` : (component.type === 'ground' ? 'GND' : (component.type === 'led' ? `Vf=${component.properties.forwardVoltage}V` : '')); const visHTML = this.getComponentVisualHTML(component); const simValHTML = component.simulation?.currentValue !== undefined ? `<div class="component-sim-value">${component.simulation.currentValue.toFixed(2)} ${component.simulation.currentUnit || ''} ${component.simulation.error ? '⚠️':''}</div>` : ''; el.innerHTML = `<div class="component-header"><span class="component-name">${component.type}</span><span class="component-value">${valStr}</span></div><div class="component-visual">${visHTML}</div>${simValHTML}${component.terminals.map(t => `<div class="component-terminal ${this.getTerminalPositionClass(t.side)}" data-terminal-id="${t.id}" data-parent-id="${component.id}" title="Term ${t.id.slice(-1)} V=${component.simulation?.nodeVoltages?.[t.nodeId]?.toFixed(2)??'?'}"></div>`).join('')}`; el.querySelectorAll('.component-terminal').forEach(tEl => tEl.addEventListener('mousedown', (e) => { e.stopPropagation(); if(!this.isSimulating) this.handleTerminalMouseDown(e, tEl.dataset.parentId, tEl.dataset.terminalId); })); el.classList.toggle('selected', component.id === this.selectedComponentId); el.classList.toggle('error', !!component.simulation?.error); this.updateComponentVisualState(component); },
+             getComponentVisualHTML(component) { /* igual */ switch(component.type){ case 'led': return `<div class="led-visual ${component.properties.state === 'on' ? 'on' : ''}"></div>`; case 'switch': return `<div class="switch-visual ${component.properties.state === 'closed' ? 'on' : ''}"></div>`; default: return this.COMPONENT_SVG_ICONS[component.type] || `<span style="font-size:0.8em;">${component.type}</span>`; }},
+             updateComponentVisualState(component) { /* igual */ const el = document.getElementById(component.id); if(!el) return; if(component.type === 'led'){ const led = el.querySelector('.led-visual'); if(led) led.classList.toggle('on', component.properties.state === 'on'); } else if(component.type === 'switch'){ const sw = el.querySelector('.switch-visual'); if(sw) sw.classList.toggle('on', component.properties.state === 'closed'); }},
+             toggleSwitch(componentId) { const comp = this.getComponentById(componentId); if (!comp || comp.type !== 'switch') return; comp.properties.state = (comp.properties.state === 'open') ? 'closed' : 'open'; this.updateComponentVisualState(comp); this.renderComponentProperties(comp); this.clearSimulationResults(); this.saveCurrentCircuit(); this.showNotification("Switch", `Estado: ${comp.properties.state}`, "info", 1000); },
+             getTerminalPositionClass(side) { /* igual */ switch (side) { case 'left': return 'terminal-left'; case 'right': return 'terminal-right'; case 'top': return 'terminal-top'; case 'bottom': return 'terminal-bottom'; default: return 'terminal-right'; } },
+             getTerminalAbsolutePosition(componentId, terminalId) { /* igual */ const comp = this.getComponentById(componentId); const term = comp?.terminals.find(t => t.id === terminalId); const compEl = document.getElementById(componentId); const termEl = compEl?.querySelector(`[data-terminal-id="${terminalId}"]`); if (!comp || !term || !compEl || !termEl) return null; const termRect = termEl.getBoundingClientRect(); const stageRect = this.circuitStage.parentElement.getBoundingClientRect(); const x = termRect.left + termRect.width / 2 - stageRect.left + this.circuitStage.parentElement.scrollLeft; const y = termRect.top + termRect.height / 2 - stageRect.top + this.circuitStage.parentElement.scrollTop; return { x, y }; },
+             deleteComponent(componentId) { const conns = this.connections.filter(c => c.startCompId === componentId || c.endCompId === componentId); conns.forEach(c => this.deleteConnection(c.id, false)); this.components = this.components.filter(c => c.id !== componentId); const el = document.getElementById(componentId); if (el) el.remove(); if (this.selectedComponentId === componentId) this.selectComponent(null); this.renderAllConnections(); this.clearSimulationResults(); this.saveCurrentCircuit(); this.showNotification("Componente eliminado", "", "info", 1500); },
+             deleteSelectedComponent() { if (this.selectedComponentId && !this.isSimulating) this.deleteComponent(this.selectedComponentId); },
+             selectComponent(componentId) { if (this.selectedComponentId === componentId && componentId !== null) return; if (this.selectedComponentId) { const oldEl = document.getElementById(this.selectedComponentId); if (oldEl) oldEl.classList.remove('selected'); } this.selectedComponentId = componentId; this.selectedConnectionId = null; if (this.selectedComponentId) { const newEl = document.getElementById(this.selectedComponentId); if (newEl) newEl.classList.add('selected'); const comp = this.getComponentById(componentId); this.renderComponentProperties(comp); this.deleteComponentBtn.style.display = 'inline-block'; this.deleteComponentBtn.disabled = this.isSimulating; } else { this.renderComponentProperties(null); this.deleteComponentBtn.style.display = 'none'; } },
+             renderComponentProperties(component) { if (!component) { this.componentPropertiesContentEl.innerHTML = `<div class="no-component-selected">Selecciona un componente...</div>`; this.componentPropertiesTitleEl.querySelector('span').textContent = 'Propiedades'; return; } this.componentPropertiesTitleEl.querySelector('span').textContent = `Propiedades (${component.type} - ${component.id.slice(0,8)})`; let html = '<div class="property-group">'; const dis = this.isSimulating ? 'disabled' : ''; if (component.properties.value !== undefined) { html += `<div class="property-item"><label class="property-label" for="prop_${component.id}_value">Valor:</label><input class="property-input" type="number" step="any" id="prop_${component.id}_value" data-property="value" value="${component.properties.value}" ${dis}>${component.properties.unit ? `<span class="property-unit">${component.properties.unit}</span>` : ''}</div>`; } if(component.type === 'resistor' && component.properties.maxPower !== undefined) { html += `<div class="property-item"><label class="property-label" for="prop_${component.id}_maxP">Pot. Max:</label><input class="property-input" type="number" step="0.01" min="0" id="prop_${component.id}_maxP" data-property="maxPower" value="${component.properties.maxPower}" ${dis}><span class="property-unit">W</span></div>`;} if(component.type === 'capacitor' && component.properties.icVoltage !== undefined) { html += `<div class="property-item"><label class="property-label" for="prop_${component.id}_icV">V Inicial:</label><input class="property-input" type="number" step="any" id="prop_${component.id}_icV" data-property="icVoltage" value="${component.properties.icVoltage}" ${dis}><span class="property-unit">V</span></div>`;} if(component.type === 'inductor' && component.properties.icCurrent !== undefined) { html += `<div class="property-item"><label class="property-label" for="prop_${component.id}_icI">I Inicial:</label><input class="property-input" type="number" step="any" id="prop_${component.id}_icI" data-property="icCurrent" value="${component.properties.icCurrent}" ${dis}><span class="property-unit">A</span></div>`;} if (component.type === 'led' && component.properties.forwardVoltage !== undefined) { html += `<div class="property-item"><label class="property-label" for="prop_${component.id}_fv">Voltaje (Fwd):</label><input class="property-input" type="number" step="0.1" id="prop_${component.id}_fv" data-property="forwardVoltage" value="${component.properties.forwardVoltage}" ${dis}><span class="property-unit">V</span></div>`; html += `<div class="property-item"><label class="property-label" for="prop_${component.id}_ron">R ON:</label><input class="property-input" type="number" step="0.1" min="0.01" id="prop_${component.id}_ron" data-property="r_on" value="${component.properties.r_on}" ${dis}><span class="property-unit">Ω</span></div>`;} if (component.properties.state !== undefined && component.type !== 'led') { html += `<div class="property-item"><label class="property-label">Estado:</label><span style="font-weight:500;">${component.properties.state}</span>${component.type === 'switch' ? '<span style="font-size:0.8em; color:#888;"> (Clic para cambiar)</span>' : ''}</div>`; } html += '</div>'; if(component.simulation?.lastValue !== undefined) { html += `<div class="property-group"><div class="panel-title" style="font-size:0.9em;margin-bottom:0.3em;">Último Valor Sim:</div><div class="property-item"><label class="property-label">Valor:</label><span>${component.simulation.lastValue.toFixed(3)} ${component.simulation.lastUnit || ''}</span></div>${component.simulation.error ? `<div class="property-item" style="color:red;"><label class="property-label">Error:</label><span>${component.simulation.error}</span></div>`:''}</div>`; } this.componentPropertiesContentEl.innerHTML = html; this.componentPropertiesContentEl.querySelectorAll('.property-input').forEach(input => { input.addEventListener('change', (e) => { const prop = e.target.dataset.property; let val = e.target.value; if (e.target.type === 'number' || !isNaN(parseFloat(val))) { val = parseFloat(val); if (isNaN(val)) { this.showNotification("Error", "Valor inválido.", "error"); e.target.value = component.properties[prop]; return; } } this.updateComponentProperty(component.id, prop, val); }); }); },
+             updateComponentProperty(componentId, propertyName, newValue) { const comp = this.getComponentById(componentId); if (!comp || !comp.properties.hasOwnProperty(propertyName)) return; comp.properties[propertyName] = newValue; this.renderComponent(comp); this.renderComponentProperties(comp); this.clearSimulationResults(); this.saveCurrentCircuit(); },
 
-            // --- CORE LOGIC: Connections (igual) ---
-             startConnection(componentId, terminalId) { this.isConnecting = true; const pos = this.getTerminalAbsolutePosition(componentId, terminalId); if (!pos) { this.isConnecting = false; return; } this.connectionStart = { componentId, terminalId, x: pos.x, y: pos.y }; this.tempWire = document.createElementNS('http://www.w3.org/2000/svg', 'line'); this.tempWire.setAttribute('x1', pos.x); this.tempWire.setAttribute('y1', pos.y); this.tempWire.setAttribute('x2', pos.x); this.tempWire.setAttribute('y2', pos.y); this.tempWire.setAttribute('class', 'temp-wire'); this.connectionsSvg.appendChild(this.tempWire); document.body.style.cursor = 'crosshair'; this.circuitStage.classList.add('connecting'); },
-             updateTempConnection(mouseX, mouseY) { if (!this.isConnecting || !this.tempWire) return; const stageRect = this.circuitStage.parentElement.getBoundingClientRect(); const svgX = mouseX - stageRect.left + this.circuitStage.parentElement.scrollLeft; const svgY = mouseY - stageRect.top + this.circuitStage.parentElement.scrollTop; this.tempWire.setAttribute('x2', svgX); this.tempWire.setAttribute('y2', svgY); this.circuitStage.querySelectorAll('.component-terminal.highlight').forEach(t => t.classList.remove('highlight')); const termEl = document.elementFromPoint(mouseX, mouseY); if (termEl && termEl.classList.contains('component-terminal') && termEl.dataset.terminalId !== this.connectionStart.terminalId) termEl.classList.add('highlight'); },
-             endConnection(targetElement, mouseX, mouseY) { if (!this.isConnecting) return; const startCId = this.connectionStart.componentId; const startTId = this.connectionStart.terminalId; if (this.tempWire) { this.tempWire.remove(); this.tempWire = null; } document.body.style.cursor = 'default'; this.circuitStage.classList.remove('connecting'); this.circuitStage.querySelectorAll('.component-terminal.highlight').forEach(t => t.classList.remove('highlight')); let endTermEl = null; if (targetElement && targetElement.classList.contains('component-terminal')) endTermEl = targetElement; else { const elUnder = document.elementFromPoint(mouseX, mouseY); if (elUnder && elUnder.classList.contains('component-terminal')) endTermEl = elUnder; } if (endTermEl && endTermEl.dataset.terminalId !== startTId) { const endCId = endTermEl.dataset.parentId; const endTId = endTermEl.dataset.terminalId; const sTerm = this.getComponentById(startCId)?.terminals.find(t => t.id === startTId); const eTerm = this.getComponentById(endCId)?.terminals.find(t => t.id === endTId); if (sTerm && eTerm) { const connId = `conn_${Date.now()}_${Math.random().toString(16).slice(2)}`; const conn = { id: connId, startCompId:startCId, startTermId:startTId, endCompId:endCId, endTermId:endTId, active: false }; this.connections.push(conn); this.renderConnection(conn); this.saveCurrentCircuit(); this.showNotification("Conexión creada", "", "success", 1000); } else { this.showNotification("Conexión inválida", "", "warning", 2000); } } this.isConnecting = false; this.connectionStart = null; },
-             renderConnection(connection) { let line = this.connectionsSvg.querySelector(`[data-connection-id="${connection.id}"]`); if (!line) { line = document.createElementNS('http://www.w3.org/2000/svg', 'line'); line.dataset.connectionId = connection.id; line.classList.add('connection-wire'); this.connectionsSvg.appendChild(line); } const p1 = this.getTerminalAbsolutePosition(connection.startCompId, connection.startTermId); const p2 = this.getTerminalAbsolutePosition(connection.endCompId, connection.endTermId); if (p1 && p2) { line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y); line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y); } else { console.warn("Term Pos NULL para conn:", connection.id); this.deleteConnection(connection.id); return; } line.classList.toggle('active', !!connection.active); },
-             renderAllConnections() { const exist = new Set(); this.connectionsSvg.querySelectorAll('.connection-wire').forEach(l => exist.add(l.dataset.connectionId)); const curr = new Set(this.connections.map(c => c.id)); this.connections.forEach(c => this.renderConnection(c)); exist.forEach(id => { if (!curr.has(id)) { const l = this.connectionsSvg.querySelector(`[data-connection-id="${id}"]`); if (l) l.remove(); } }); },
-             deleteConnection(connectionId, save = true) { this.connections = this.connections.filter(c => c.id !== connectionId); const line = this.connectionsSvg.querySelector(`[data-connection-id="${connectionId}"]`); if (line) line.remove(); if (save) { this.saveCurrentCircuit(); this.showNotification("Conexión eliminada", "", "info", 1000); } if (this.isSimulating) this.runSimulationStep(); },
+            // --- CORE LOGIC: Connections ---
+            startConnection(componentId, terminalId) { /* igual */ if(this.isSimulating) return; this.isConnecting = true; const pos = this.getTerminalAbsolutePosition(componentId, terminalId); if (!pos) { this.isConnecting = false; return; } this.connectionStart = { componentId, terminalId, x: pos.x, y: pos.y }; this.tempWire = document.createElementNS('http://www.w3.org/2000/svg', 'line'); this.tempWire.setAttribute('x1', pos.x); this.tempWire.setAttribute('y1', pos.y); this.tempWire.setAttribute('x2', pos.x); this.tempWire.setAttribute('y2', pos.y); this.tempWire.setAttribute('class', 'temp-wire'); this.connectionsSvg.appendChild(this.tempWire); document.body.style.cursor = 'crosshair'; this.circuitStage.classList.add('connecting'); },
+            updateTempConnection(mouseX, mouseY) { /* igual */ if (!this.isConnecting || !this.tempWire) return; const stageRect = this.circuitStage.parentElement.getBoundingClientRect(); const svgX = mouseX - stageRect.left + this.circuitStage.parentElement.scrollLeft; const svgY = mouseY - stageRect.top + this.circuitStage.parentElement.scrollTop; this.tempWire.setAttribute('x2', svgX); this.tempWire.setAttribute('y2', svgY); this.circuitStage.querySelectorAll('.component-terminal.highlight').forEach(t => t.classList.remove('highlight')); const termEl = document.elementFromPoint(mouseX, mouseY); if (termEl && termEl.classList.contains('component-terminal') && termEl.dataset.terminalId !== this.connectionStart.terminalId) termEl.classList.add('highlight'); },
+            endConnection(targetElement, mouseX, mouseY) { /* igual */ if (!this.isConnecting) return; const startCId = this.connectionStart.componentId; const startTId = this.connectionStart.terminalId; if (this.tempWire) { this.tempWire.remove(); this.tempWire = null; } document.body.style.cursor = 'default'; this.circuitStage.classList.remove('connecting'); this.circuitStage.querySelectorAll('.component-terminal.highlight').forEach(t => t.classList.remove('highlight')); let endTermEl = null; if (targetElement && targetElement.classList.contains('component-terminal')) endTermEl = targetElement; else { const elUnder = document.elementFromPoint(mouseX, mouseY); if (elUnder && elUnder.classList.contains('component-terminal')) endTermEl = elUnder; } if (endTermEl && endTermEl.dataset.terminalId !== startTId) { const endCId = endTermEl.dataset.parentId; const endTId = endTermEl.dataset.terminalId; const sTerm = this.getComponentById(startCId)?.terminals.find(t => t.id === startTId); const eTerm = this.getComponentById(endCId)?.terminals.find(t => t.id === endTId); if (sTerm && eTerm) { const connId = `conn_${Date.now()}_${Math.random().toString(16).slice(2)}`; const conn = { id: connId, startCompId:startCId, startTermId:startTId, endCompId:endCId, endTermId:endTId, simulation: {} }; this.connections.push(conn); this.renderConnection(conn); this.clearSimulationResults(); this.saveCurrentCircuit(); this.showNotification("Conexión creada", "", "success", 1000); } else { this.showNotification("Conexión inválida", "", "warning", 2000); } } this.isConnecting = false; this.connectionStart = null; },
+            renderConnection(connection) { /* igual */ let line = this.connectionsSvg.querySelector(`[data-connection-id="${connection.id}"]`); if (!line) { line = document.createElementNS('http://www.w3.org/2000/svg', 'line'); line.dataset.connectionId = connection.id; line.classList.add('connection-wire'); this.connectionsSvg.appendChild(line); } const p1 = this.getTerminalAbsolutePosition(connection.startCompId, connection.startTermId); const p2 = this.getTerminalAbsolutePosition(connection.endCompId, connection.endTermId); if (p1 && p2) { line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y); line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y); } else { /*console.warn("Term Pos NULL para conn:", connection.id);*/ this.deleteConnection(connection.id); return; } line.classList.toggle('active', !!connection.simulation?.active); line.classList.toggle('error', !!connection.simulation?.error); },
+            renderAllConnections() { /* igual */ const exist = new Set(); this.connectionsSvg.querySelectorAll('.connection-wire').forEach(l => exist.add(l.dataset.connectionId)); const curr = new Set(this.connections.map(c => c.id)); this.connections.forEach(c => this.renderConnection(c)); exist.forEach(id => { if (!curr.has(id)) { const l = this.connectionsSvg.querySelector(`[data-connection-id="${id}"]`); if (l) l.remove(); } }); },
+            deleteConnection(connectionId, save = true) { this.connections = this.connections.filter(c => c.id !== connectionId); const line = this.connectionsSvg.querySelector(`[data-connection-id="${connectionId}"]`); if (line) line.remove(); if (save) { this.clearSimulationResults(); this.saveCurrentCircuit(); this.showNotification("Conexión eliminada", "", "info", 1000); } },
 
-            // --- CORE LOGIC: Drag & Drop (igual) ---
-             handleComponentMouseDown(event, componentId) { if (event.button !== 0) return; event.preventDefault(); event.stopPropagation(); const comp = this.getComponentById(componentId); if (!comp || this.isSimulating) return; /* No drag si simula */ this.isDragging = true; this.draggedComponentId = componentId; this.selectComponent(componentId); const compEl = document.getElementById(componentId); const cRect = compEl.getBoundingClientRect(); this.dragOffset.x = event.clientX - cRect.left; this.dragOffset.y = event.clientY - cRect.top; compEl.style.zIndex = 10; document.body.style.cursor = 'move'; },
-             handleTerminalMouseDown(event, componentId, terminalId) { if (event.button !== 0 || this.isSimulating) return; /* No conectar si simula */ event.preventDefault(); event.stopPropagation(); this.startConnection(componentId, terminalId); },
-             handleStageMouseDown(event) { if (event.button !== 0) return; if (event.target === this.circuitStage || event.target === this.circuitCanvas || event.target === this.connectionsSvg) { this.selectComponent(null); this.selectedConnectionId = null; } },
-             handleDocumentMouseMove(event) { if (this.isDragging && this.draggedComponentId) { event.preventDefault(); const comp = this.getComponentById(this.draggedComponentId); if (!comp) return; const compEl = document.getElementById(this.draggedComponentId); const stageParent = this.circuitStage.parentElement; const sRect = stageParent.getBoundingClientRect(); const nVPX = event.clientX - this.dragOffset.x; const nVPY = event.clientY - this.dragOffset.y; let nX = nVPX - sRect.left + stageParent.scrollLeft; let nY = nVPY - sRect.top + stageParent.scrollTop; nX = Math.max(0, nX); nY = Math.max(0, nY); comp.x = nX; comp.y = nY; compEl.style.left = `${nX}px`; compEl.style.top = `${nY}px`; this.updateConnectionsForComponent(this.draggedComponentId); } else if (this.isConnecting) { event.preventDefault(); this.updateTempConnection(event.clientX, event.clientY); } },
-             handleDocumentMouseUp(event) { if (this.isDragging && this.draggedComponentId) { if (event.button !== 0) return; const compEl = document.getElementById(this.draggedComponentId); if (compEl) compEl.style.zIndex = 1; this.isDragging = false; this.draggedComponentId = null; document.body.style.cursor = 'default'; this.saveCurrentCircuit(); } else if (this.isConnecting) { if (event.button !== 0) return; this.endConnection(event.target, event.clientX, event.clientY); } },
-             handleStageDoubleClick(event) { const compEl = event.target.closest('.component'); if (compEl && !this.isSimulating) { console.log("DblClick Comp:", compEl.dataset.componentId); } },
-             handleKeyDown(event) { if ((event.key === 'Delete' || event.key === 'Backspace') && this.selectedComponentId && !this.isSimulating) { if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return; event.preventDefault(); this.deleteSelectedComponent(); } else if (event.key === 'Escape') { if (this.isConnecting) { if (this.tempWire) this.tempWire.remove(); this.tempWire = null; document.body.style.cursor = 'default'; this.circuitStage.classList.remove('connecting'); this.isConnecting = false; this.connectionStart = null; } else if (this.selectedComponentId || this.selectedConnectionId) { this.selectComponent(null); this.selectedConnectionId = null; } else { this.hideModal('newCircuitModal'); this.hideModal('graphModal'); } } else if (event.ctrlKey && event.key === 's') { event.preventDefault(); this.saveCurrentCircuit(); this.showNotification("Guardado", "Circuito guardado.", "success", 1000); } },
-             handleStageMouseOver(event) { const target = event.target; if (target.classList.contains('component-terminal')) { const pId = target.dataset.parentId; const tId = target.dataset.terminalId; const comp = this.getComponentById(pId); if (comp) { const term = comp.terminals.find(t => t.id === tId); this.showTooltip(`Terminal ${term?.side} (${comp.type})`, event); } } else if (target.closest('.component')) { const compEl = target.closest('.component'); const compId = compEl.dataset.componentId; const comp = this.getComponentById(compId); if (comp) { this.showTooltip(`${comp.type} (${comp.id.slice(0,6)})`, event); } } },
-             handleStageMouseOut(event) { this.hideTooltip(); },
-             updateConnectionsForComponent(componentId) { this.connections.forEach(conn => { if (conn.startCompId === componentId || conn.endCompId === componentId) { this.renderConnection(conn); } }); },
+            // --- CORE LOGIC: Drag & Drop ---
+             handleComponentMouseDown(event, componentId) { /* igual */ if (event.button !== 0 || this.isSimulating) return; event.preventDefault(); event.stopPropagation(); const comp = this.getComponentById(componentId); if (!comp) return; this.isDragging = true; this.draggedComponentId = componentId; this.selectComponent(componentId); const compEl = document.getElementById(componentId); const cRect = compEl.getBoundingClientRect(); this.dragOffset.x = event.clientX - cRect.left; this.dragOffset.y = event.clientY - cRect.top; compEl.style.zIndex = 10; document.body.style.cursor = 'move'; },
+             handleTerminalMouseDown(event, componentId, terminalId) { /* igual */ if (event.button !== 0 || this.isSimulating) return; event.preventDefault(); event.stopPropagation(); this.startConnection(componentId, terminalId); },
+             handleStageMouseDown(event) { /* igual */ if (event.button !== 0) return; if (event.target === this.circuitStage || event.target === this.circuitCanvas || event.target === this.connectionsSvg) { this.selectComponent(null); this.selectedConnectionId = null; } },
+             handleDocumentMouseMove(event) { /* igual */ if (this.isDragging && this.draggedComponentId) { event.preventDefault(); const comp = this.getComponentById(this.draggedComponentId); if (!comp) return; const compEl = document.getElementById(this.draggedComponentId); const stageParent = this.circuitStage.parentElement; const sRect = stageParent.getBoundingClientRect(); const nVPX = event.clientX - this.dragOffset.x; const nVPY = event.clientY - this.dragOffset.y; let nX = nVPX - sRect.left + stageParent.scrollLeft; let nY = nVPY - sRect.top + stageParent.scrollTop; nX = Math.max(0, nX); nY = Math.max(0, nY); comp.x = nX; comp.y = nY; compEl.style.left = `${nX}px`; compEl.style.top = `${nY}px`; this.updateConnectionsForComponent(this.draggedComponentId); this.clearSimulationResults(); } else if (this.isConnecting) { event.preventDefault(); this.updateTempConnection(event.clientX, event.clientY); } },
+             handleDocumentMouseUp(event) { /* igual */ if (this.isDragging && this.draggedComponentId) { if (event.button !== 0) return; const compEl = document.getElementById(this.draggedComponentId); if (compEl) compEl.style.zIndex = 1; this.isDragging = false; this.draggedComponentId = null; document.body.style.cursor = 'default'; this.saveCurrentCircuit(); } else if (this.isConnecting) { if (event.button !== 0) return; this.endConnection(event.target, event.clientX, event.clientY); } },
+             handleStageDoubleClick(event) { /* igual */ const compEl = event.target.closest('.component'); if (compEl && !this.isSimulating) { console.log("DblClick Comp:", compEl.dataset.componentId); } },
+             handleKeyDown(event) { /* igual */ if ((event.key === 'Delete' || event.key === 'Backspace') && this.selectedComponentId && !this.isSimulating) { if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return; event.preventDefault(); this.deleteSelectedComponent(); } else if (event.key === 'Escape') { if (this.isConnecting) { if (this.tempWire) this.tempWire.remove(); this.tempWire = null; document.body.style.cursor = 'default'; this.circuitStage.classList.remove('connecting'); this.isConnecting = false; this.connectionStart = null; } else if (this.selectedComponentId || this.selectedConnectionId) { this.selectComponent(null); this.selectedConnectionId = null; } else { this.hideModal('newCircuitModal'); this.hideModal('graphModal'); } } else if (event.ctrlKey && event.key === 's') { event.preventDefault(); this.saveCurrentCircuit(); this.showNotification("Guardado", "Circuito guardado.", "success", 1000); } },
+             handleStageMouseOver(event) { /* igual */ const target = event.target; if (target.classList.contains('component-terminal')) { const pId=target.dataset.parentId, tId=target.dataset.terminalId; const comp = this.getComponentById(pId); if (comp) { const term = comp.terminals.find(t => t.id === tId); const vStr = comp.simulation?.nodeVoltages?.[term.nodeId] !== undefined ? `V=${comp.simulation.nodeVoltages[term.nodeId].toFixed(2)}V` : ''; this.showTooltip(`Term ${term?.side} (${comp.type}) ${vStr}`, event); } } else if (target.closest('.component')) { const compEl = target.closest('.component'); const compId = compEl.dataset.componentId; const comp = this.getComponentById(compId); if (comp) { const simStr = comp.simulation?.currentValue ? ` (${comp.simulation.currentValue.toFixed(2)}${comp.simulation.currentUnit||''})` : ''; this.showTooltip(`${comp.type} (${comp.id.slice(0,6)})${simStr}`, event); } } },
+             handleStageMouseOut(event) { /* igual */ this.hideTooltip(); },
+             updateConnectionsForComponent(componentId) { /* igual */ this.connections.forEach(conn => { if (conn.startCompId === componentId || conn.endCompId === componentId) this.renderConnection(conn); }); },
 
-            // --- CORE LOGIC: Simulation (Igual pero con botón corregido) ---
-            toggleSimulation() { if (this.isSimulating) { this.stopSimulation(); } else { this.startSimulation(); } },
-            startSimulation() { if (!this.currentCircuitId || this.components.length === 0) { this.showNotification("Simulación", "No hay circuito.", "warning"); return; } if (this.isSimulating) return; this.isSimulating = true; this.simulationTime = 0; this.simulationData = []; this.simulationStatusEl.textContent = 'Estado: Corriendo'; this.simulationStatusEl.style.color = 'green'; this.simulateBtn.textContent = 'Simulación Activa'; this.simulateBtn.classList.replace('btn-success', 'btn-danger'); this.showNotification("Simulación Iniciada", "", "info"); this.toggleUIEditability(false); const intTime = 100; this.simulationInterval = setInterval(() => { this.simulationTime += intTime / 1000; this.simulationTimeEl.textContent = `${this.simulationTime.toFixed(2)}s`; this.runSimulationStep(); if (this.simulationTime >= 10) { this.stopSimulation(); this.showNotification("Simulación Completada", "Se simularon 10s.", "success"); } }, intTime); },
-            stopSimulation() { if (!this.isSimulating) return; this.isSimulating = false; clearInterval(this.simulationInterval); this.simulationInterval = null; this.simulationStatusEl.textContent = 'Estado: Detenido'; this.simulationStatusEl.style.color = 'red'; this.simulateBtn.textContent = 'Iniciar Simulación'; this.simulateBtn.classList.replace('btn-danger', 'btn-success'); /* CORRECCIÓN AQUÍ */ this.showNotification("Simulación Detenida", "", "info"); this.connections.forEach(c => c.active = false); this.components.forEach(c => { if(c.type === 'led') c.properties.state = 'off'; }); this.renderAllComponents(); this.renderAllConnections(); this.toggleUIEditability(true); },
-             toggleUIEditability(editable) { document.querySelectorAll('.component-btn').forEach(b => b.disabled = !editable); this.deleteComponentBtn.disabled = !editable || !this.selectedComponentId; this.componentPropertiesContentEl.querySelectorAll('input, select, textarea').forEach(i => i.disabled = !editable); document.getElementById('newCircuitBtn').disabled = !editable; this.circuitsListEl.style.pointerEvents = editable ? 'auto' : 'none'; this.circuitsListEl.querySelectorAll('button').forEach(b => b.disabled = !editable); document.getElementById('resetSimulationBtn').disabled = !this.isSimulating; this.generateGraphBtn.disabled = this.isSimulating; /* Deshabilitar gráficas si simula */},
-             runSimulationStep() { let v=0, c=0, p=0, led=false; const bat = this.components.find(cp => cp.type === 'battery'); if (bat) { const amp = bat.properties.value || 9; const freq = 0.5; v = amp * Math.sin(2 * Math.PI * freq * this.simulationTime); c = (v / 1000) * (0.8 + Math.random()*0.4); p = v * c; led = v > amp * 0.5; } this.connections.forEach(cn => cn.active = led); this.components.forEach(cp => { if (cp.type === 'led') cp.properties.state = led ? 'on' : 'off'; }); this.renderAllComponents(); this.renderAllConnections(); this.simulationData.push({ time: parseFloat(this.simulationTime.toFixed(2)), voltage: parseFloat(v.toFixed(2)), current: parseFloat(c.toFixed(3)), power: parseFloat(p.toFixed(3)) }); if (this.simulationData.length > 500) this.simulationData.shift(); },
+            // --- TRANSIENT SIMULATION (Simplified) ---
+            clearSimulationResults() {
+                 this.simulationData = [];
+                 this.simulationTime = 0;
+                 this.simError = null;
+                 this.simulationStatusEl.textContent = "Estado: No simulado";
+                 this.simulationStatusEl.style.color = 'inherit';
+                 this.simulationTimeEl.textContent = '0.00s';
+                 this.components.forEach(c => { c.simulation = {}; this.renderComponent(c); });
+                 this.connections.forEach(c => { c.simulation = {}; this.renderConnection(c); });
+            },
 
-            // --- CORE LOGIC: Circuit Management (igual) ---
-             createNewCircuit(name, description = "") { const id = `circ_${Date.now()}`; const circ = { id, name, description, components: [], connections: [] }; this.circuits.push(circ); this.saveCircuitsToStorage(); this.renderCircuitsList(); this.loadCircuit(id); this.showNotification("Circuito Creado", `"${name}"`, "success"); },
-             loadCircuit(circuitId) { if (this.currentCircuitId === circuitId) return; if(this.currentCircuitId) this.saveCurrentCircuit(); const circ = this.circuits.find(c => c.id === circuitId); if (!circ) { console.error("Load Error: Not found", circuitId); this.showNotification("Error Carga", `ID ${circuitId} no encontrado.`, "error"); return; } this.stopSimulation(); this.currentCircuitId = circuitId; localStorage.setItem('lastCircuitId', circuitId); this.circuitStage.innerHTML = ''; this.connectionsSvg.innerHTML = ''; this.components = JSON.parse(JSON.stringify(circ.components || [])); this.connections = JSON.parse(JSON.stringify(circ.connections || [])); this.selectedComponentId = null; this.selectedConnectionId = null; this.isConnecting = false; this.isDragging = false; document.body.style.cursor = 'default'; this.renderAllComponents(); this.renderAllConnections(); this.selectComponent(null); this.renderCircuitsList(); this.showNotification("Circuito Cargado", `"${circ.name}"`, "info"); },
-             renderAllComponents() { const ids = new Set(this.components.map(c => c.id)); this.circuitStage.querySelectorAll('.component').forEach(el => { if (!ids.has(el.id)) el.remove(); }); this.components.forEach(c => this.renderComponent(c)); },
-             saveCurrentCircuit() { if (!this.currentCircuitId) return; const circ = this.circuits.find(c => c.id === this.currentCircuitId); if (circ) { circ.components = JSON.parse(JSON.stringify(this.components)); circ.connections = JSON.parse(JSON.stringify(this.connections)); this.saveCircuitsToStorage(); } else { console.error("Save Error: Circuit not found", this.currentCircuitId); } },
-             deleteCircuit(circuitId) { const idx = this.circuits.findIndex(c => c.id === circuitId); if (idx === -1) return; const name = this.circuits[idx].name; this.circuits.splice(idx, 1); this.saveCircuitsToStorage(); this.renderCircuitsList(); if (this.currentCircuitId === circuitId) { this.currentCircuitId = null; this.circuitStage.innerHTML = ''; this.connectionsSvg.innerHTML = ''; this.components = []; this.connections = []; this.selectComponent(null); if (this.circuits.length > 0) { this.loadCircuit(this.circuits[0].id); } else { this.createNewCircuit("Circuito Nuevo", ""); } } this.showNotification("Circuito Eliminado", `"${name}"`, "info"); },
-             renderCircuitsList() { this.circuitsListEl.innerHTML = ''; if (this.circuits.length === 0) { this.circuitsListEl.innerHTML = '<p style="padding: 1rem; color: #777; font-style: italic;">No hay circuitos.</p>'; return; } this.circuits.forEach(c => { const i = document.createElement('div'); i.className = 'circuit-item'; i.dataset.circuitId = c.id; i.classList.toggle('active', c.id === this.currentCircuitId); i.innerHTML = `<button class="delete-circuit-btn btn btn-danger btn-sm" title="Eliminar ${c.name}">&times;</button><div class="circuit-item-name">${c.name || 'Sin nombre'}</div><div class="circuit-item-info">${c.description || 'Sin desc.'}</div>`; this.circuitsListEl.appendChild(i); }); },
-             loadCircuitsFromStorage() { const d = localStorage.getItem('circuits'); if (d) { try { this.circuits = JSON.parse(d); if (!Array.isArray(this.circuits)) this.circuits = []; } catch(e){ console.error("Err parse circuits", e); this.circuits = []; this.showNotification("Error Carga", "Datos corruptos.", "error"); } } else this.circuits = []; },
-             saveCircuitsToStorage() { try { localStorage.setItem('circuits', JSON.stringify(this.circuits)); } catch (e) { console.error("Err save circuits", e); this.showNotification("Error Guardado", "LocalStorage lleno?", "error"); } },
+            startSimulation() {
+                 if (this.isSimulating) return;
+                 if (typeof math === 'undefined') { this.showNotification("Error", "Librería Math.js no disponible.", "error"); return;}
 
-            // --- CORE LOGIC: Graphing ---
+                 this.clearSimulationResults();
+                 this.isSimulating = true;
+                 this.simError = null;
+                 this.simulationStatusEl.textContent = "Estado: Simulando...";
+                 this.simulationStatusEl.style.color = 'orange';
+                 this.simulateBtn.disabled = true;
+                 this.stopSimBtn.style.display = 'inline-block';
+                 this.generateGraphBtn.disabled = true;
+                 this.toggleUIEditability(false); // Deshabilitar edición
+                 this.showNotification("Simulación Iniciada", `Duración: ${this.simSettings.duration}s, dt: ${this.simSettings.timeStep*1000}ms`, "info");
+
+                 // --- Preparación Inicial ---
+                 let currentTime = 0;
+                 const dt = this.simSettings.timeStep;
+                 const duration = this.simSettings.duration;
+
+                 // Identificar nodos (hacerlo una vez)
+                 const { nodeMap, nodes, groundNodeId } = this.identifyNodes();
+                 if (!nodes || nodes.size === 0) {
+                      this.simError = "Error identificando nodos.";
+                      this.stopSimulation(); return;
+                 }
+
+                 // Estado inicial (t=0) - Podría hacerse un DC solve rápido o usar ICs
+                 const initialNodeVoltages = new Map();
+                 const initialComponentValues = new Map(); // Para guardar V/I iniciales de C/L
+                 nodes.forEach((_, nodeId) => initialNodeVoltages.set(nodeId, 0)); // Asumir 0V inicial en todos los nodos
+                 initialNodeVoltages.set(groundNodeId, 0);
+
+                 this.components.forEach(comp => {
+                     const compState = { v: 0, i: 0, p: 0, state: comp.properties.state };
+                     if (comp.type === 'capacitor') {
+                          compState.v = comp.properties.icVoltage || 0;
+                          // Actualizar voltaje nodal inicial si C está conectado a tierra
+                          const term1Node = nodeMap.get(comp.terminals[0]?.id);
+                          const term2Node = nodeMap.get(comp.terminals[1]?.id);
+                          if (term1Node && term2Node) {
+                               if (term2Node === groundNodeId) initialNodeVoltages.set(term1Node, compState.v);
+                               else if (term1Node === groundNodeId) initialNodeVoltages.set(term2Node, -compState.v);
+                               // Si no, no podemos fijar V nodal solo con Vcap inicial
+                          }
+                     } else if (comp.type === 'inductor') {
+                          compState.i = comp.properties.icCurrent || 0;
+                     } else if (comp.type === 'battery') {
+                           compState.v = comp.properties.value;
+                           // Fijar voltajes nodales si está a tierra (como en DC)
+                           const termPos = comp.terminals.find(t => t.side === 'top');
+                           const termNeg = comp.terminals.find(t => t.side === 'bottom');
+                           const nodePosId = nodeMap.get(termPos?.id);
+                           const nodeNegId = nodeMap.get(termNeg?.id);
+                           if (nodePosId && nodeNegId) {
+                               if (nodeNegId === groundNodeId) initialNodeVoltages.set(nodePosId, compState.v);
+                               else if (nodePosId === groundNodeId) initialNodeVoltages.set(nodeNegId, -compState.v);
+                           }
+                     }
+                     initialComponentValues.set(comp.id, compState);
+                      // Guardar voltajes nodales iniciales en componentes para display/tooltip
+                       comp.simulation = { nodeVoltages: {} };
+                       comp.terminals.forEach(term => {
+                            term.nodeId = nodeMap.get(term.id);
+                            if(term.nodeId !== undefined && initialNodeVoltages.has(term.nodeId)){
+                                 comp.simulation.nodeVoltages[term.nodeId] = initialNodeVoltages.get(term.nodeId);
+                            }
+                       });
+                 });
+
+                 // Guardar estado t=0
+                 this.simulationData.push({
+                     time: 0,
+                     nodeVoltages: new Map(initialNodeVoltages), // Copiar mapa
+                     componentValues: new Map(initialComponentValues) // Copiar mapa
+                 });
+
+                 let previousNodeVoltages = initialNodeVoltages;
+                 let previousComponentValues = initialComponentValues;
+
+                 // --- Bucle de Simulación ---
+                 const runStep = () => {
+                     if (!this.isSimulating || currentTime >= duration) {
+                         this.stopSimulation();
+                         if(this.simError) this.showNotification("Simulación Fallida", this.simError, "error");
+                         else this.showNotification("Simulación Finalizada", `Completada a t=${currentTime.toFixed(2)}s`, "success");
+                         return;
+                     }
+
+                     currentTime += dt;
+                     this.simulationTime = currentTime; // Actualizar para UI
+                     this.simulationTimeEl.textContent = `${currentTime.toFixed(2)}s`;
+
+                     try {
+                          // 1. Construir Matriz para este paso de tiempo
+                          const { G, I, nodeIndexMap, fixedVoltages } = this.setupTimestepMatrix(nodeMap, nodes, groundNodeId, dt, previousNodeVoltages, previousComponentValues);
+                           if (!G || !I) throw new Error(this.simError || "Error construyendo matriz en t=" + currentTime.toFixed(3));
+
+                          // 2. Resolver sistema
+                           let solvedNodeVoltages = {};
+                           if (G.length > 0 && I.length > 0) {
+                               solvedNodeVoltages = this.solveLinearSystem(G, I);
+                               if (!solvedNodeVoltages) throw new Error("Sistema no resoluble en t=" + currentTime.toFixed(3));
+                           }
+
+                          // 3. Obtener todos los voltajes nodales actuales
+                           const currentNodeVoltages = new Map();
+                           currentNodeVoltages.set(groundNodeId, 0);
+                           fixedVoltages.forEach((v, id) => currentNodeVoltages.set(id, v));
+                           nodeIndexMap.forEach((idx, id) => {
+                               if(solvedNodeVoltages[idx] !== undefined) currentNodeVoltages.set(id, solvedNodeVoltages[idx]);
+                               else if (!currentNodeVoltages.has(id)) currentNodeVoltages.set(id, NaN); // Error si falta
+                           });
+
+                           // 4. Calcular V/I/P actuales en componentes
+                           const currentComponentValues = this.calculateTimestepValues(currentNodeVoltages, nodeMap, dt, previousNodeVoltages, previousComponentValues);
+
+                           // 5. Guardar estado actual
+                           this.simulationData.push({
+                                time: currentTime,
+                                nodeVoltages: new Map(currentNodeVoltages),
+                                componentValues: new Map(currentComponentValues)
+                           });
+
+                            // 6. Preparar para el siguiente paso
+                            previousNodeVoltages = currentNodeVoltages;
+                            previousComponentValues = currentComponentValues;
+
+                            // 7. Actualizar UI (opcional, puede ralentizar)
+                            // this.updateUiWithTransientResults(currentComponentValues);
+
+
+                         // Planificar siguiente paso
+                         this.simulationInterval = requestAnimationFrame(runStep); // Usar rAF para mejor rendimiento UI
+
+                     } catch (error) {
+                         console.error(`Error en simulación en t=${currentTime.toFixed(3)}s:`, error);
+                         this.simError = `Error en t=${currentTime.toFixed(3)}s: ${error.message}`;
+                         this.stopSimulation(); // Detener en caso de error
+                     }
+                 };
+
+                 // Iniciar el primer paso
+                  this.simulationInterval = requestAnimationFrame(runStep);
+
+            },
+
+             stopSimulation() {
+                 if (!this.isSimulating && !this.simulationInterval) return; // Ya detenido
+
+                 this.isSimulating = false;
+                 if (this.simulationInterval) {
+                      cancelAnimationFrame(this.simulationInterval); // Cancelar rAF
+                      this.simulationInterval = null;
+                 }
+                 this.simulationStatusEl.textContent = `Estado: ${this.simError ? 'Error' : 'Detenido'}`;
+                 this.simulationStatusEl.style.color = this.simError ? 'red' : 'inherit';
+                 this.simulateBtn.disabled = false;
+                 this.stopSimBtn.style.display = 'none';
+                 this.generateGraphBtn.disabled = false;
+                 this.toggleUIEditability(true); // Habilitar edición
+
+                 // Actualizar UI con el último estado calculado (opcional)
+                 if (this.simulationData.length > 0) {
+                      const lastState = this.simulationData[this.simulationData.length - 1];
+                       this.updateUiWithTransientResults(lastState.componentValues, lastState.nodeVoltages);
+                 } else {
+                     // Si no hay datos (error al inicio?), limpiar UI
+                     this.clearSimulationResults();
+                 }
+
+                  console.log(`Simulación detenida en t=${this.simulationTime.toFixed(2)}s`);
+                   if(!this.simError) this.showNotification("Simulación Detenida", `Finalizó en t=${this.simulationTime.toFixed(2)}s`, "info");
+             },
+
+             updateUiWithTransientResults(componentValues, nodeVoltages) {
+                  // Actualizar estado visual de componentes (LED, errores) y valores mostrados
+                  this.components.forEach(comp => {
+                       const values = componentValues.get(comp.id);
+                       if (values) {
+                            comp.simulation = { // Guardar último estado relevante para display
+                                 lastValue: values.displayValue ?? values.v ?? values.i ?? 0,
+                                 lastUnit: values.displayUnit ?? (values.v !== undefined ? 'V' : (values.i !== undefined ? 'A' : '')),
+                                 error: values.error,
+                                 state: values.state, // Para LED/Switch
+                                 nodeVoltages: {} // Llenar voltajes nodales para tooltip
+                            };
+                             comp.terminals.forEach(term => {
+                                  if(term.nodeId && nodeVoltages.has(term.nodeId)){
+                                       comp.simulation.nodeVoltages[term.nodeId] = nodeVoltages.get(term.nodeId);
+                                  }
+                             });
+                       } else {
+                           comp.simulation = {}; // Limpiar si no hay datos
+                       }
+                       this.renderComponent(comp); // Re-renderizar para mostrar cambios
+                  });
+
+                  // Actualizar animación de cables
+                  const currentThreshold = 1e-6; // Umbral para mostrar animación
+                  this.connections.forEach(conn => {
+                      // Usar corriente de uno de los componentes conectados (ej. el primero que no sea fuente)
+                      // Esto es una aproximación!
+                      const comp1 = this.getComponentById(conn.startCompId);
+                      const comp2 = this.getComponentById(conn.endCompId);
+                      const comp1Vals = componentValues.get(conn.startCompId);
+                      const comp2Vals = componentValues.get(conn.endCompId);
+                      let current = 0;
+                      if(comp1 && comp1.type !== 'battery' && comp1Vals?.i !== undefined) current = comp1Vals.i;
+                      else if(comp2 && comp2.type !== 'battery' && comp2Vals?.i !== undefined) current = comp2Vals.i; // O tomar la del segundo?
+
+                      conn.simulation = { active: Math.abs(current) > currentThreshold };
+                      this.renderConnection(conn);
+                  });
+             },
+
+
+             // --- Lógica de Matriz y Cálculo por Paso ---
+             setupTimestepMatrix(nodeMap, nodes, groundNodeId, dt, prevNodeVoltages, prevCompValues) {
+                 const errors = [];
+                 const nodeIds = Array.from(nodes.keys()).filter(id => id !== groundNodeId);
+                 const fixedVoltages = new Map();
+                 let matrixIndex = 0;
+                 const nodeIndexMap = new Map();
+                 const nodesToSolve = [];
+
+                 // Identificar nodos fijos por fuentes DC (igual que antes)
+                 this.components.forEach(comp => {
+                      if (comp.type === 'battery') {
+                           const termPos = comp.terminals.find(t => t.side === 'top'); const termNeg = comp.terminals.find(t => t.side === 'bottom');
+                           const nodePosId = nodeMap.get(termPos?.id); const nodeNegId = nodeMap.get(termNeg?.id);
+                           if (!nodePosId || !nodeNegId) return;
+                           if (nodePosId === nodeNegId) { errors.push(`Corto en Batería ${comp.id.slice(0,6)}`); comp.simulation = { error: "Cortocircuito" }; }
+                           if (nodeNegId === groundNodeId && nodePosId !== groundNodeId) { if (fixedVoltages.has(nodePosId) && fixedVoltages.get(nodePosId) !== comp.properties.value) errors.push(`Conflicto V en ${nodePosId}`); fixedVoltages.set(nodePosId, comp.properties.value); }
+                           else if (nodePosId === groundNodeId && nodeNegId !== groundNodeId) { if (fixedVoltages.has(nodeNegId) && fixedVoltages.get(nodeNegId) !== -comp.properties.value) errors.push(`Conflicto V en ${nodeNegId}`); fixedVoltages.set(nodeNegId, -comp.properties.value); }
+                           // Ignorar flotantes por ahora
+                      }
+                 });
+
+                 // Crear mapa de índices para nodos no fijos
+                 nodeIds.forEach(nodeId => { if (!fixedVoltages.has(nodeId)) { nodeIndexMap.set(nodeId, matrixIndex++); nodesToSolve.push(nodeId); } });
+                 const n = nodesToSolve.length;
+                 if (n === 0 && fixedVoltages.size > 0) return { G: [], I: [], nodeIndexMap, fixedVoltages, errors };
+                 if (n === 0 && fixedVoltages.size === 0) { errors.push("No hay nodos variables."); return { G: null, I: null, nodeIndexMap, fixedVoltages, errors };}
+
+                 const G = math.zeros(n, n).valueOf();
+                 const I = math.zeros(n).valueOf();
+
+                 // Estampar componentes
+                 this.components.forEach(comp => {
+                      const term1 = comp.terminals[0];
+                      const term2 = comp.terminals[1]; // Puede no existir (ground)
+                      const node1Id = nodeMap.get(term1?.id);
+                      const node2Id = nodeMap.get(term2?.id) ?? groundNodeId; // Asumir tierra si falta T2 o no está conectado
+
+                      if (node1Id === undefined || node2Id === undefined) return; // Componente no conectado
+
+                      const isNode1Fixed = fixedVoltages.has(node1Id);
+                      const isNode2Fixed = fixedVoltages.has(node2Id);
+                      const node1Index = nodeIndexMap.get(node1Id); // Undefined si es fijo o tierra
+                      const node2Index = nodeIndexMap.get(node2Id); // Undefined si es fijo o tierra
+
+                      const prevV1 = prevNodeVoltages.get(node1Id) ?? 0;
+                      const prevV2 = prevNodeVoltages.get(node2Id) ?? 0;
+                      const prevCompState = prevCompValues.get(comp.id) ?? { v: 0, i: 0 };
+
+                      let G_eq = 0; // Conductancia equivalente
+                      let I_eq = 0; // Fuente de corriente equivalente
+
+                      switch (comp.type) {
+                          case 'resistor':
+                              G_eq = 1 / (comp.properties.value || 1e-9);
+                              break;
+                          case 'switch':
+                               const Rsw = comp.properties.state === 'closed' ? comp.properties.r_on : comp.properties.r_off;
+                               G_eq = 1 / (Rsw || 1e-9);
+                              break;
+                           case 'capacitor':
+                               const C = comp.properties.value || 1e-12;
+                                G_eq = C / dt; // G = C/dt for Backward Euler
+                                I_eq = G_eq * prevV1 - G_eq*prevV2; // Isrc = (C/dt)*V_prev across C
+                               // Corriente va de nodo 1 a nodo 2 si I_eq es positiva
+                               break;
+                           case 'inductor':
+                                // Modelo Thevenin: R = L/dt, Vsrc = (L/dt) * I_prev
+                                // Estampar esto es más complejo que G e I.
+                                // Simplificación: Ignorar por ahora, tratar como corto (muy baja R).
+                                console.warn(`Inductor ${comp.id} no implementado en matriz, tratado como R baja.`);
+                                G_eq = 1 / 0.001; // Tratar como 1mOhm por ahora
+                                // TODO: Implementar estampado correcto MNA para inductor
+                                errors.push(`Inductor ${comp.id.slice(0,6)} no simulado correctamente.`);
+                                break;
+                           case 'led':
+                                // Modelo Simplificado: Vdrop + R_on o R_off
+                                const Vfwd = comp.properties.forwardVoltage || 2.0;
+                                const Ron = comp.properties.r_on || 5;
+                                const Roff = 1e9; // Resistencia muy alta apagado
+                                const Vprev_diode = prevV1 - prevV2;
+
+                                if (Vprev_diode > Vfwd) { // Estimación simple para ON
+                                     // Modelo: Fuente V=Vfwd en serie con R=Ron
+                                     // Esto es difícil de estampar directamente en Nodal puro.
+                                     // Simplificación adicional: Tratar como Resistencia Ron.
+                                     console.warn(`LED ${comp.id} ON (simplificado), usando Ron=${Ron}Ω.`);
+                                     G_eq = 1 / Ron;
+                                     // Aquí MNA manejaría la fuente Vfwd.
+                                     // Podríamos intentar añadir Vfwd*G_eq a I, pero dirección es clave.
+                                     // I_eq += (prevV1 > prevV2 ? 1 : -1) * Vfwd * G_eq; // Intento MUY APROXIMADO
+                                } else { // OFF
+                                     console.warn(`LED ${comp.id} OFF (simplificado), usando Roff=${Roff}Ω.`);
+                                     G_eq = 1 / Roff;
+                                }
+                                errors.push(`LED ${comp.id.slice(0,6)} simulación muy aproximada.`);
+                                break;
+                            case 'battery': // Las baterías ya fijaron nodos o no se soportan flotantes
+                            case 'ground':
+                                 continue; // No contribuyen directamente a la matriz G/I así
+                      }
+
+                      // --- Estampado en G y I ---
+                      // Nodo 1 (si no es tierra)
+                      if (node1Id !== groundNodeId) {
+                           if (!isNode1Fixed) { // Si es variable
+                               G[node1Index][node1Index] += G_eq;
+                               I[node1Index] += I_eq; // Fuente Eq entra al nodo 1
+                               // Efecto de nodo 2 fijo/tierra
+                               if (isNode2Fixed) I[node1Index] += G_eq * fixedVoltages.get(node2Id);
+                               else if (node2Id === groundNodeId) { /* No hacer nada (V=0) */ }
+                           } else { // Si es fijo
+                               // Modificar I del nodo 2 si es variable
+                               if (node2Id !== groundNodeId && !isNode2Fixed) {
+                                    I[node2Index] -= G_eq * fixedVoltages.get(node1Id); // G*V1
+                                    I[node2Index] -= I_eq; // Fuente Eq sale del nodo 2
+                               }
+                           }
+                      }
+                      // Nodo 2 (si no es tierra)
+                       if (node2Id !== groundNodeId) {
+                            if (!isNode2Fixed) { // Si es variable
+                                G[node2Index][node2Index] += G_eq;
+                                I[node2Index] -= I_eq; // Fuente Eq sale del nodo 2
+                                // Efecto de nodo 1 fijo/tierra
+                                if (isNode1Fixed) I[node2Index] += G_eq * fixedVoltages.get(node1Id);
+                                else if (node1Id === groundNodeId) { /* No hacer nada (V=0) */ }
+                            } else { // Si es fijo
+                                 // Modificar I del nodo 1 si es variable
+                                 if (node1Id !== groundNodeId && !isNode1Fixed) {
+                                      I[node1Index] -= G_eq * fixedVoltages.get(node2Id); // G*V2
+                                      I[node1Index] += I_eq; // Fuente Eq entra al nodo 1
+                                 }
+                            }
+                       }
+                       // Fuera de diagonal (si ambos son variables)
+                       if (node1Id !== groundNodeId && node2Id !== groundNodeId && !isNode1Fixed && !isNode2Fixed) {
+                            G[node1Index][node2Index] -= G_eq;
+                            G[node2Index][node1Index] -= G_eq;
+                       }
+
+                 }); // Fin loop componentes
+
+                 // Añadir errores acumulados
+                 if (errors.length > 0) this.simError = (this.simError ? this.simError + "; " : "") + errors.join('; ');
+
+                 return { G, I, nodeIndexMap, fixedVoltages };
+             },
+
+             solveLinearSystem(G, I) { /* igual */ if (typeof math === 'undefined') { console.error("Math.js no disponible."); return null; } try { const sol = math.lusolve(G, I); if (sol && typeof sol.toArray === 'function') { const arr = sol.toArray(); return Array.isArray(arr[0]) ? arr.flat() : arr; } else if (Array.isArray(sol)) { return sol; } else { console.error("Solución inesperada:", sol); return null; } } catch (error) { console.error("Error resolviendo sistema:", error); return null; } },
+
+             calculateTimestepValues(currentNodeVoltages, nodeMap, dt, prevNodeVoltages, prevCompValues) {
+                 const currentComponentValues = new Map();
+                 const componentErrors = []; // Errores específicos de este paso
+
+                 this.components.forEach(comp => {
+                     const term1 = comp.terminals[0];
+                     const term2 = comp.terminals[1]; // Puede no existir
+                     const node1Id = nodeMap.get(term1?.id);
+                     const node2Id = nodeMap.get(term2?.id) ?? this.GROUND_NODE_ID;
+
+                     if (node1Id === undefined || node2Id === undefined || !currentNodeVoltages.has(node1Id) || !currentNodeVoltages.has(node2Id)) {
+                          currentComponentValues.set(comp.id, { v: NaN, i: NaN, p: NaN, error: "Nodos no resueltos" });
+                          return;
+                     }
+
+                     const v1 = currentNodeVoltages.get(node1Id);
+                     const v2 = currentNodeVoltages.get(node2Id);
+                     const v = v1 - v2; // Voltaje actual a través del componente
+
+                     const prevCompState = prevCompValues.get(comp.id) ?? { v: 0, i: 0 };
+                     const prevV = prevCompState.v ?? 0;
+                     const prevI = prevCompState.i ?? 0;
+
+                     let i = NaN, p = NaN, state = comp.properties.state, error = null;
+                     let displayValue = v, displayUnit = 'V'; // Valor a mostrar por defecto
+
+                     switch (comp.type) {
+                          case 'resistor':
+                               const R = comp.properties.value || 1e-9;
+                                i = v / R;
+                                p = v * i;
+                                displayValue = v; displayUnit = 'V';
+                               // Check power
+                                if (comp.properties.maxPower && Math.abs(p) > comp.properties.maxPower) {
+                                    error = `Sobrecarga! P=${p.toFixed(2)}W > Max=${comp.properties.maxPower}W`;
+                                    componentErrors.push(error);
+                                }
+                                break;
+                          case 'switch':
+                               const Rsw = comp.properties.state === 'closed' ? comp.properties.r_on : comp.properties.r_off;
+                                i = v / (Rsw || 1e-9);
+                                p = v * i;
+                                displayValue = v; displayUnit = 'V';
+                                break;
+                           case 'capacitor':
+                                const C = comp.properties.value || 1e-12;
+                                // Corriente usando Backward Euler: I_n = C * (V_n - V_{n-1}) / dt
+                                i = C * (v - prevV) / dt;
+                                p = v * i; // Potencia instantánea
+                                displayValue = v; displayUnit = 'V';
+                                break;
+                           case 'inductor':
+                                const L = comp.properties.value || 1e-9;
+                                // Corriente usando Backward Euler: I_n = I_{n-1} + (dt / L) * V_n
+                                i = prevI + (dt / L) * v;
+                                p = v * i;
+                                displayValue = i; displayUnit = 'A'; // Mostrar corriente para inductor
+                                break;
+                           case 'led':
+                                const Vfwd = comp.properties.forwardVoltage || 2.0;
+                                const Ron = comp.properties.r_on || 5;
+                                const Roff = 1e9;
+                                if (v > Vfwd) { // ON (simplificado)
+                                     i = (v - Vfwd) / Ron; // Corriente aprox con caída V y Ron
+                                     state = 'on';
+                                } else { // OFF
+                                     i = v / Roff; // Corriente muy baja
+                                     state = 'off';
+                                }
+                                p = v * i;
+                                displayValue = v; displayUnit = 'V';
+                                break;
+                           case 'battery':
+                                i = NaN; // No calculamos corriente de fuente fácilmente
+                                p = NaN;
+                                displayValue = comp.properties.value; displayUnit = 'V';
+                                break;
+                            case 'ground':
+                                i = NaN; p = 0; v = 0;
+                                displayValue = 0; displayUnit = 'V';
+                                break;
+                     }
+                     currentComponentValues.set(comp.id, { v, i, p, state, error, displayValue, displayUnit });
+                 });
+
+                 // Añadir errores de este paso al estado global si existen
+                 if(componentErrors.length > 0) this.simError = (this.simError ? this.simError + "; " : "") + componentErrors.join('; ');
+
+                 return currentComponentValues;
+             },
+
+            // --- Circuit Management ---
+             createNewCircuit(name, description = "") { /* igual */ const id = `circ_${Date.now()}`; const circ = { id, name, description, components: [], connections: [] }; this.circuits.push(circ); this.saveCircuitsToStorage(); this.renderCircuitsList(); this.loadCircuit(id); this.showNotification("Circuito Creado", `"${name}"`, "success"); },
+             loadCircuit(circuitId) { /* igual */ if (this.currentCircuitId === circuitId) return; if(this.currentCircuitId) this.saveCurrentCircuit(); const circ = this.circuits.find(c => c.id === circuitId); if (!circ) { console.error("Load Error: Not found", circuitId); this.showNotification("Error Carga", `ID ${circuitId} no encontrado.`, "error"); return; } this.stopSimulation(); /* Detener si corría */ this.clearSimulationResults(); this.currentCircuitId = circuitId; localStorage.setItem('lastCircuitId', circuitId); this.circuitStage.innerHTML = ''; this.connectionsSvg.innerHTML = ''; this.components = JSON.parse(JSON.stringify(circ.components || [])); this.connections = JSON.parse(JSON.stringify(circ.connections || [])); this.selectedComponentId = null; this.selectedConnectionId = null; this.isConnecting = false; this.isDragging = false; document.body.style.cursor = 'default'; this.renderAllComponents(); this.renderAllConnections(); this.selectComponent(null); this.renderCircuitsList(); this.showNotification("Circuito Cargado", `"${circ.name}"`, "info"); },
+             renderAllComponents() { /* igual */ const ids = new Set(this.components.map(c => c.id)); this.circuitStage.querySelectorAll('.component').forEach(el => { if (!ids.has(el.id)) el.remove(); }); this.components.forEach(c => this.renderComponent(c)); },
+             saveCurrentCircuit() { /* igual */ if (!this.currentCircuitId) return; const circ = this.circuits.find(c => c.id === this.currentCircuitId); if (circ) { circ.components = JSON.parse(JSON.stringify(this.components.map(c => { const { simulation, ...rest } = c; return rest; }))); circ.connections = JSON.parse(JSON.stringify(this.connections.map(c => { const { simulation, ...rest } = c; return rest; }))); this.saveCircuitsToStorage(); } else { console.error("Save Error: Circuit not found", this.currentCircuitId); } },
+             deleteCircuit(circuitId) { /* igual */ const idx = this.circuits.findIndex(c => c.id === circuitId); if (idx === -1) return; const name = this.circuits[idx].name; this.circuits.splice(idx, 1); this.saveCircuitsToStorage(); this.renderCircuitsList(); if (this.currentCircuitId === circuitId) { this.currentCircuitId = null; this.circuitStage.innerHTML = ''; this.connectionsSvg.innerHTML = ''; this.components = []; this.connections = []; this.selectComponent(null); this.clearSimulationResults(); if (this.circuits.length > 0) { this.loadCircuit(this.circuits[0].id); } else { this.createNewCircuit("Circuito Nuevo", ""); } } this.showNotification("Circuito Eliminado", `"${name}"`, "info"); },
+             renderCircuitsList() { /* igual */ this.circuitsListEl.innerHTML = ''; if (this.circuits.length === 0) { this.circuitsListEl.innerHTML = '<p style="padding: 1rem; color: #777; font-style: italic;">No hay circuitos.</p>'; return; } this.circuits.forEach(c => { const i = document.createElement('div'); i.className = 'circuit-item'; i.dataset.circuitId = c.id; i.classList.toggle('active', c.id === this.currentCircuitId); i.innerHTML = `<button class="delete-circuit-btn btn btn-danger btn-sm" title="Eliminar ${c.name}">&times;</button><div class="circuit-item-name">${c.name || 'Sin nombre'}</div><div class="circuit-item-info">${c.description || 'Sin desc.'}</div>`; this.circuitsListEl.appendChild(i); }); },
+             loadCircuitsFromStorage() { /* igual */ const d = localStorage.getItem('circuits'); if (d) { try { this.circuits = JSON.parse(d); if (!Array.isArray(this.circuits)) this.circuits = []; } catch(e){ console.error("Err parse circuits", e); this.circuits = []; this.showNotification("Error Carga", "Datos corruptos.", "error"); } } else this.circuits = []; },
+             saveCircuitsToStorage() { /* igual */ try { localStorage.setItem('circuits', JSON.stringify(this.circuits)); } catch (e) { console.error("Err save circuits", e); this.showNotification("Error Guardado", "LocalStorage lleno?", "error"); } },
+
+            // --- Graphing / Results Display ---
              showGraphModal() {
-                  if (typeof Recharts === 'undefined') { this.showNotification("Error", "Librería Recharts no cargada.", "error"); return; }
+                 if (typeof Recharts === 'undefined' || typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                     this.showNotification("Error", "Librerías de gráficas no cargadas.", "error"); return;
+                 }
+                 if (this.isSimulating) {
+                      this.showNotification("Info", "Detén la simulación antes de generar gráficas.", "info"); return;
+                 }
+                 if (this.simulationData.length === 0 || this.simError) {
+                      this.showNotification("Sin Datos", this.simError || "Ejecuta una simulación válida primero.", this.simError ? "error" : "warning");
+                      this.graphResultsBody.innerHTML = `<p style="padding:1rem; color:#888;">${this.simError || "No hay datos de simulación para mostrar."}</p>`;
+                       this.showModal('graphModal');
+                      return;
+                 }
 
-                  // *** VALIDACIÓN PLACEHOLDER ***
-                  if (!this.isCircuitValid()) {
-                       this.showNotification("Circuito Inválido", "No se pueden generar gráficas. (Validación no implementada)", "warning", 4000);
-                       return; // No mostrar modal si el circuito "falla" la validación
-                  }
+                 // Validar circuito (placeholder)
+                 if (!this.isCircuitValid()) {
+                      this.showNotification("Circuito Inválido", "No se pueden generar gráficas.", "warning"); return;
+                 }
 
-                  // Generar datos (placeholder o de simulación si hubiera)
-                  if (this.simulationData.length === 0) {
-                       this.generatePlaceholderGraphData();
-                       this.showNotification("Gráfica Ejemplo", "Mostrando datos de ejemplo.", "info", 4000);
-                  } else {
-                       this.showNotification("Mostrando Gráficas", "Datos de simulación (placeholder).", "info", 2000);
-                  }
-
-                  // Renderizar y mostrar
-                  this.renderGraphs();
-                  this.showModal('graphModal');
-                  // Activar la primera tab por defecto
-                  const firstTab = this.graphModal.querySelector('.tab');
-                  if(firstTab) this.switchGraphTab(firstTab);
+                 this.renderGraphs();
+                 this.showModal('graphModal');
+                 // Activar primera tab
+                 const firstTab = this.graphModal.querySelector('.tab');
+                 if(firstTab) this.switchGraphTab(firstTab);
              },
 
-             // *** NUEVA FUNCIÓN DE VALIDACIÓN (PLACEHOLDER) ***
-             isCircuitValid() {
-                 // Aquí iría la lógica real para detectar:
-                 // 1. Cortocircuitos (ej: Batería conectada directamente a tierra)
-                 // 2. Componentes sin conexión suficiente
-                 // 3. Bucles inválidos, etc.
-                 // 4. COMPROBACIÓN DE LÍMITES (requiere simulación previa):
-                 //    - Comparar V/I/P simulados con los límites de cada componente.
-
-                 console.warn("isCircuitValid() -> Validación real no implementada. Asumiendo circuito OK.");
-                 // Placeholder: Siempre devuelve true por ahora
-                 return true;
+             isCircuitValid() { // Placeholder
+                 console.warn("isCircuitValid() -> Validación real no implementada."); return true;
              },
 
-             generatePlaceholderGraphData() { /* ... igual ... */ this.simulationData = []; const dur=5, steps=100, amp=5, freq=1; for (let i=0; i<=steps; i++) { const t=(i/steps)*dur; const v=amp*Math.sin(2*Math.PI*freq*t); const c=(v/100)*(0.8+Math.random()*0.4); const p=v*c; this.simulationData.push({ time: parseFloat(t.toFixed(2)), voltage: parseFloat(v.toFixed(2)), current: parseFloat(c.toFixed(3)), power: parseFloat(p.toFixed(3)) }); } },
-             renderGraphs() { /* ... igual ... */ if (typeof Recharts === 'undefined') return; const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts; const renderC = (id, key, clr, unit) => { const cont = document.getElementById(id); if (!cont) return; cont.innerHTML=''; const chart = React.createElement(ResponsiveContainer, {width:"100%", height:"100%"}, React.createElement(LineChart, {data:this.simulationData, margin:{top:5, right:30, left:0, bottom:5}}, React.createElement(CartesianGrid, {strokeDasharray:"3 3"}), React.createElement(XAxis, {dataKey:"time", type:"number", label:{value:"Tiempo(s)", position:"insideBottomRight", offset:-5}, domain:['dataMin', 'dataMax'], tickFormatter:(t)=>t.toFixed(1)}), React.createElement(YAxis, {label:{value:unit, angle:-90, position:'insideLeft'}, domain:['auto', 'auto'], tickFormatter:(v)=>v.toFixed(1)}), React.createElement(Tooltip, {formatter:(v)=>`${v.toFixed(2)} ${unit}`, labelFormatter:(l)=>`t = ${l.toFixed(2)}s`}), React.createElement(Line, {type:"monotone", dataKey:key, stroke:clr, strokeWidth:2, dot:false, activeDot:{r:6}}))); ReactDOM.render(chart, cont); }; renderC('voltageGraph','voltage','#8884d8','V'); renderC('currentGraph','current','#82ca9d','A'); renderC('powerGraph','power','#ffc658','W'); },
-             switchGraphTab(targetTab) { /* ... igual ... */ const actTab = this.graphModal.querySelector('.tab.active'); const actCont = this.graphModal.querySelector('.tab-content.active'); if (actTab) actTab.classList.remove('active'); if (actCont) actCont.classList.remove('active'); targetTab.classList.add('active'); const tabName = targetTab.dataset.tab; const newCont = document.getElementById(`${tabName}Tab`); if (newCont) newCont.classList.add('active'); },
+             renderGraphs() {
+                 const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
 
-            // --- UTILITIES / HELPERS (igual) ---
-             getComponentById(id) { return this.components.find(c => c.id === id); }, getConnectionById(id) { return this.connections.find(c => c.id === id); }, showModal(id) { const m=document.getElementById(id); if(m) m.classList.add('active'); }, hideModal(id) { const m=document.getElementById(id); if(m) m.classList.remove('active'); }, showTooltip(txt, evt) { if(!txt) return; this.tooltipEl.textContent=txt; this.tooltipEl.style.display='block'; const sRect=this.circuitStage.parentElement.getBoundingClientRect(); let x=evt.clientX-sRect.left+15+this.circuitStage.parentElement.scrollLeft; let y=evt.clientY-sRect.top+15+this.circuitStage.parentElement.scrollTop; if(evt.clientX+this.tooltipEl.offsetWidth+15>window.innerWidth) x=evt.clientX-sRect.left-this.tooltipEl.offsetWidth-5+this.circuitStage.parentElement.scrollLeft; if(evt.clientY+this.tooltipEl.offsetHeight+15>window.innerHeight) y=evt.clientY-sRect.top-this.tooltipEl.offsetHeight-5+this.circuitStage.parentElement.scrollTop; this.tooltipEl.style.left=`${x}px`; this.tooltipEl.style.top=`${y}px`; }, hideTooltip() { this.tooltipEl.style.display = 'none'; }, _notificationTimeout: null, showNotification(title, msg, type='info', dur=3000) { if (this._notificationTimeout) clearTimeout(this._notificationTimeout); this.notificationTitleEl.textContent=title; this.notificationMessageEl.textContent=msg; this.notificationEl.className='notification'; this.notificationEl.classList.add(type); this.notificationEl.classList.add('show'); this._notificationTimeout = setTimeout(() => { this.notificationEl.classList.remove('show'); this._notificationTimeout = null; }, dur); }
+                 // Extraer datos para gráficas (V/I/P de componentes clave vs tiempo)
+                 const plotData = this.simulationData.map(step => {
+                      const dataPoint = { time: step.time };
+                      // Extraer valores de interés (ej: V en C1, I en L1, P en R1)
+                      // Necesitamos una forma de seleccionar qué graficar o graficar todo
+                      step.componentValues.forEach((vals, compId) => {
+                          const comp = this.getComponentById(compId);
+                           if(comp) {
+                                const prefix = `${comp.type}_${compId.slice(0,4)}`;
+                                if(vals.v !== undefined) dataPoint[`${prefix}_V`] = vals.v;
+                                if(vals.i !== undefined) dataPoint[`${prefix}_I`] = vals.i;
+                                if(vals.p !== undefined) dataPoint[`${prefix}_P`] = vals.p;
+                           }
+                      });
+                      return dataPoint;
+                 });
+
+                 // Renderizar gráficos (adaptar para mostrar V/I/P de componentes específicos)
+                 const renderChart = (containerId, dataKeys, colors, units) => {
+                      const container = document.getElementById(containerId);
+                      if (!container) return;
+                      container.innerHTML = '';
+
+                      const lines = dataKeys.map((key, index) =>
+                          React.createElement(Line, { key: key, type: "monotone", dataKey: key, stroke: colors[index % colors.length], strokeWidth: 1.5, dot: false, name: key.replace(/_/g,' ') }) // Nombre para leyenda
+                      );
+
+                      const chartElement = React.createElement(ResponsiveContainer, { width: "100%", height: "100%" },
+                          React.createElement(LineChart, { data: plotData, margin: { top: 5, right: 30, left: 0, bottom: 5 } },
+                              React.createElement(CartesianGrid, { strokeDasharray: "3 3" }),
+                              React.createElement(XAxis, { dataKey: "time", type: "number", label: { value: "Tiempo (s)", position: "insideBottomRight", offset: -5 }, domain: ['dataMin', 'dataMax'], tickFormatter: (t) => t.toFixed(2) }),
+                              React.createElement(YAxis, { label: { value: units, angle: -90, position: 'insideLeft' }, domain: ['auto', 'auto'], tickFormatter: (v) => v.toExponential(1) }), // Usar exponencial para rangos amplios
+                              React.createElement(Tooltip, { formatter: (value, name, props) => `${value.toFixed(3)} ${units}`, labelFormatter: (label) => `t = ${label.toFixed(2)}s` }),
+                              React.createElement(Legend, {}),
+                              ...lines
+                          )
+                      );
+                      ReactDOM.render(chartElement, container);
+                  };
+
+                 // Definir qué graficar y en qué tab (Ejemplo: V en R1,C1 / I en R1,L1 / P en R1)
+                  const voltageKeys = plotData[0] ? Object.keys(plotData[0]).filter(k => k.endsWith('_V')) : [];
+                  const currentKeys = plotData[0] ? Object.keys(plotData[0]).filter(k => k.endsWith('_I')) : [];
+                  const powerKeys = plotData[0] ? Object.keys(plotData[0]).filter(k => k.endsWith('_P')) : [];
+                  const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#387908', '#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
+                  renderChart('voltageGraph', voltageKeys, colors, 'V');
+                  renderChart('currentGraph', currentKeys, colors, 'A');
+                  renderChart('powerGraph', powerKeys, colors, 'W');
+             },
+             switchGraphTab(targetTab) { /* igual */ const actTab = this.graphModal.querySelector('.tab.active'); const actCont = this.graphModal.querySelector('.tab-content.active'); if (actTab) actTab.classList.remove('active'); if (actCont) actCont.classList.remove('active'); targetTab.classList.add('active'); const tabName = targetTab.dataset.tab; const newCont = document.getElementById(`${tabName}Tab`); if (newCont) newCont.classList.add('active'); },
+
+            // --- UTILITIES / HELPERS ---
+            getComponentById(id) { return this.components.find(c => c.id === id); },
+            getConnectionById(id) { return this.connections.find(c => c.id === id); },
+            showModal(id) { const m = document.getElementById(id); if (m) m.classList.add('active'); },
+            hideModal(id) { const m = document.getElementById(id); if (m) m.classList.remove('active'); },
+            showTooltip(txt, evt) { if(!txt) return; this.tooltipEl.textContent=txt; this.tooltipEl.style.display='block'; const pRect=this.circuitStage.parentElement.getBoundingClientRect(); let x=evt.clientX-pRect.left+15+this.circuitStage.parentElement.scrollLeft; let y=evt.clientY-pRect.top+15+this.circuitStage.parentElement.scrollTop; const ttW=this.tooltipEl.offsetWidth, ttH=this.tooltipEl.offsetHeight; const winW=window.innerWidth, winH=window.innerHeight; if(evt.clientX+ttW+15 > winW) x=evt.clientX-pRect.left-ttW-5+this.circuitStage.parentElement.scrollLeft; if(evt.clientY+ttH+15 > winH) y=evt.clientY-pRect.top-ttH-5+this.circuitStage.parentElement.scrollTop; this.tooltipEl.style.left=`${x}px`; this.tooltipEl.style.top=`${y}px`; },
+            hideTooltip() { this.tooltipEl.style.display = 'none'; },
+            _notificationTimeout: null,
+            showNotification(title, msg, type='info', dur=3000) { if (this._notificationTimeout) clearTimeout(this._notificationTimeout); this.notificationTitleEl.textContent=title; this.notificationMessageEl.textContent=msg; this.notificationEl.className='notification'; this.notificationEl.classList.add(type); this.notificationEl.classList.add('show'); this._notificationTimeout = setTimeout(() => { this.notificationEl.classList.remove('show'); this._notificationTimeout = null; }, dur); }
         };
         document.addEventListener('DOMContentLoaded', () => { CircuitSimulator.workspace = document.querySelector('.workspace'); CircuitSimulator.init(); });
     </script>
+
 </body>
 </html>
